@@ -1,0 +1,62 @@
+name: Daily release
+
+# Готовые версии лежат черновиками (draft) и выходят по одной в день, начиная с самой младшей.
+# Черновик невидим для автообновления, пока его не опубликуют.
+on:
+  schedule:
+    - cron: "0 9 * * *"   # 12:00 по Москве
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-release
+
+jobs:
+  publish:
+    name: Publish the next draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the oldest ready draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import json, os, re, subprocess, sys
+
+          repo = os.environ["REPO"]
+
+          def api(*args):
+              out = subprocess.run(["gh", "api", *args], check=True, capture_output=True, text=True).stdout
+              return json.loads(out) if out.strip() else None
+
+          def ver(tag):
+              return tuple(int(x) for x in re.findall(r"\d+", tag))
+
+          releases = api(f"repos/{repo}/releases?per_page=100")
+          latest = max((ver(r["tag_name"]) for r in releases if not r["draft"]), default=())
+          ready = []
+          for r in releases:
+              names = {a["name"] for a in r["assets"]}
+              if not r["draft"] or not re.fullmatch(r"v\d+(\.\d+)+", r["tag_name"]):
+                  continue
+              if ver(r["tag_name"]) <= latest:
+                  print(f"skip {r['tag_name']}: not newer than the latest release")
+                  continue
+              if "SHA256SUMS.txt" not in names or "NowPlayingServer.exe" not in names:
+                  print(f"skip {r['tag_name']}: files are missing")
+                  continue
+              ready.append(r)
+
+          if not ready:
+              print("nothing to publish today")
+              sys.exit(0)
+
+          nxt = min(ready, key=lambda r: ver(r["tag_name"]))
+          api("-X", "PATCH", f"repos/{repo}/releases/{nxt['id']}", "-F", "draft=false", "-f", "make_latest=true")
+          left = len(ready) - 1
+          print(f"published {nxt['tag_name']}, {left} left in the queue")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(f"Published **{nxt['tag_name']}**. Drafts left: {left}.\n")
