@@ -34,6 +34,7 @@ from winrt.windows.storage.streams import Buffer, InputStreamOptions
 
 import background
 import clips
+import bands
 import calendar_ics
 import pcstate
 import photoframe
@@ -46,7 +47,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '2.0'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.1'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -362,6 +363,10 @@ def jsonr(data):
 
 
 async def h_now(request):
+    dev = request.query.get('dev', '')[:40] or None
+    if dev and request.query.get('v'):
+        SETTINGS.seen(dev, request.query.get('name', ''), request.remote or '', request.query['v'])
+    S = SETTINGS.view(dev)    # общие настройки и поверх — свои у этого устройства
     s = dict(state)
     if s['playing'] and s['duration_ms']:
         s['position_ms'] = int(min(s['position_ms'] + now_ms() - s['measured_at'], s['duration_ms']))
@@ -369,18 +374,18 @@ async def h_now(request):
     s['server_time_ms'] = int(now_ms())
     s['has_art'] = s['track_id'] in art
     s['lyrics_ready'] = s['track_id'] in lyrics
-    s['bg'] = FRAME.info() or (BG.info() if SETTINGS['clock_bg'] else None)   # фоторамка важнее своего фона
+    s['bg'] = (FRAME.info() if S['frame_on'] else None) or (BG.info() if S['clock_bg'] else None)   # фоторамка важнее своего фона
     s['clip'] = CLIPS.info(s['track_id'])          # видео из Яндекс Музыки (если включено)
-    s['track_media'] = TRACK_BG.info() if SETTINGS['track_bg'] == 'custom' else None
+    s['track_media'] = TRACK_BG.info() if S['track_bg'] == 'custom' else None
     # размытая обложка: выбрана сама или как запасной фон, пока у трека нет видео из клипа
-    fallback_blur = SETTINGS['track_bg'] == 'video' and not s['clip'] and SETTINGS['video_fallback'] == 'blur'
-    if (SETTINGS['track_bg'] == 'blur' or fallback_blur) and s['has_art']:
+    fallback_blur = S['track_bg'] == 'video' and not s['clip'] and S['video_fallback'] == 'blur'
+    if (S['track_bg'] == 'blur' or fallback_blur) and s['has_art']:
         rev = f"{s['track_id']}r{s['art_rev']}"   # новая (чёткая) обложка — новый размытый фон
         s['track_media'] = {'id': rev, 'type': 'image', 'ext': 'jpg', 'url': f"/art/{s['track_id']}-blur.jpg?r={s['art_rev']}"}
-    s['ui'] = SETTINGS.ui()
-    s['weather'] = WEATHER.info() if SETTINGS['weather'] else None   # строка под датой
-    s['widgets'] = widgets.build(SETTINGS.get(), WEATHER.info(), WEATHER.forecast_info(), PC_STATE.info(), CALENDAR.info())
-    s['wol'] = widgets.wol_info(request, SETTINGS['wol'])
+    s['ui'] = SETTINGS.ui_for(dev)
+    s['weather'] = WEATHER.info() if S['weather'] else None   # строка под датой
+    s['widgets'] = widgets.build(S, WEATHER.info(), WEATHER.forecast_info(), PC_STATE.info(), CALENDAR.info())
+    s['wol'] = widgets.wol_info(request, S['wol'])
     if request.remote not in ('127.0.0.1', '::1') and request.query.get('v'):
         LAST_CLIENT.update(ip=request.remote, at=time.time(), version=request.query['v'][:20])
     s['apk_version'] = UPDATER.apk[0] if UPDATER.apk else None  # планшет сравнит со своей
@@ -509,6 +514,7 @@ WEATHER = weather.Weather(SETTINGS)
 PC_STATE = pcstate.PcState(SETTINGS)
 CALENDAR = calendar_ics.Calendar(SETTINGS)
 FRAME = photoframe.PhotoFrame(SETTINGS)
+BANDS = bands.Bands()
 PULSE = pulse.Pulse()
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
@@ -544,7 +550,7 @@ async def h_pulse(request):
     try:
         end = time.time() + 600
         while time.time() < end:
-            on = state['playing'] and SETTINGS['pulse']
+            on = state['playing'] and SETTINGS.anywhere(lambda v: v['pulse'])
             PULSE.want(on)
             await resp.write(b'%.2f\n' % (PULSE.level if on else 0.0))
             await asyncio.sleep(1 / 25)
@@ -554,6 +560,28 @@ async def h_pulse(request):
         PULSE.clients -= 1
         if PULSE.clients <= 0:
             PULSE.want(False)
+    return resp
+
+
+async def h_bands(request):
+    """Поток полос частот для визуализатора: строка из 24 чисел 0–99, 30 раз в секунду.
+    Как и /api/pulse — через 10 минут сервер закрывает соединение, планшет переподключится."""
+    resp = web.StreamResponse(headers={'Content-Type': 'text/plain', 'Cache-Control': 'no-store'})
+    await resp.prepare(request)
+    BANDS.clients += 1
+    try:
+        end = time.time() + 600
+        while time.time() < end:
+            on = state['playing'] and SETTINGS.anywhere(lambda v: v['visualizer'] != 'off')
+            BANDS.want(on)
+            await resp.write((BANDS.line() if on else '0 ' * 23 + '0').encode() + b'\n')
+            await asyncio.sleep(1 / 30)
+    except Exception:   # планшет отключился
+        pass
+    finally:
+        BANDS.clients -= 1
+        if BANDS.clients <= 0:
+            BANDS.want(False)
     return resp
 
 
@@ -639,6 +667,7 @@ def create_app():
         web.get(r'/clip/{id:[0-9a-f]{12}}.mp4', h_clip),
         web.get('/update/app.apk', h_apk),
         web.get('/api/pulse', h_pulse),
+        web.get('/api/bands', h_bands),
         web.get(r'/bg-track/{id:[0-9a-f]{12}}.{ext:jpg|mp4}', h_track_bg),
         *settings_web.routes(sys.modules[__name__]),
         web.get('/health', lambda r: web.Response(text='ok')),

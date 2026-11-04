@@ -45,7 +45,7 @@ class PcState:
         self.no_gpu = False   # nvidia-smi не нашёлся или не отвечает — больше не дёргаем
 
     def wanted(self):
-        return 'pc' in self.settings['widget_slots']
+        return self.settings.anywhere(lambda v: 'pc' in v['widget_slots'])
 
     def info(self):
         if not self.wanted() or self.cpu is None:

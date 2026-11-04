@@ -14,6 +14,7 @@ from aiohttp import web
 import adbtool
 import background
 import photoframe
+import settings
 import weather
 import widgets
 
@@ -57,10 +58,17 @@ def routes(srv):
         url = ('/bg/' if bg is srv.BG else '/bg-track/') + f"{c['id']}.{c['ext']}"
         return {'type': c['type'], 'url': url, 'name': c.get('source', '')}
 
-    def state():
+    def device_of(request):
+        dev = request.query.get('device', '')
+        return dev if dev in srv.SETTINGS.devices else ''
+
+    def state(dev=''):
         tablet = srv.LAST_CLIENT
         return {
-            'settings': srv.SETTINGS.get(),
+            'settings': srv.SETTINGS.view(dev or None),
+            'device': dev,
+            'devices': srv.SETTINGS.device_list(),
+            'device_keys': list(settings.DEVICE_KEYS),
             'version': srv.VERSION,
             'clock_media': media_info(srv.BG),
             'track_media': media_info(srv.TRACK_BG),
@@ -79,12 +87,31 @@ def routes(srv):
                                 headers={'Cache-Control': 'no-store'})
 
     async def get_state(request):
-        return srv.jsonr(state())
+        return srv.jsonr(state(device_of(request)))
 
     async def post_settings(request):
         changes = await request.json()
-        srv.SETTINGS.update(changes if isinstance(changes, dict) else {})
-        return srv.jsonr(state())
+        changes = changes if isinstance(changes, dict) else {}
+        dev = device_of(request)
+        if dev:
+            srv.SETTINGS.update_device(dev, changes)
+        else:
+            srv.SETTINGS.update(changes)
+        return srv.jsonr(state(dev))
+
+    async def device_action(request):
+        dev, action = request.match_info['id'], request.match_info['action']
+        if dev not in srv.SETTINGS.devices:
+            raise web.HTTPNotFound()
+        if action == 'reset':
+            srv.SETTINGS.reset_device(dev)
+        elif action == 'rename':
+            body = await request.json()
+            srv.SETTINGS.rename_device(dev, (body or {}).get('name', ''))
+        elif action == 'forget':
+            srv.SETTINGS.forget_device(dev)
+            return srv.jsonr(state())
+        return srv.jsonr(state(dev))
 
     async def upload(request):
         kind = request.match_info['kind']
@@ -198,6 +225,7 @@ def routes(srv):
         web.post(r'/api/settings/open/{kind:clock|track}', local_only(open_folder)),
         web.get('/api/settings/geocode', local_only(geocode)),
         web.post('/api/settings/frame/pick', local_only(frame_pick)),
+        web.post(r'/api/settings/device/{id:[0-9a-zA-Z_-]{1,40}}/{action:reset|rename|forget}', local_only(device_action)),
         web.get('/api/settings/adb', local_only(adb_status)),
         web.post('/api/settings/adb/download', local_only(adb_download)),
         web.post('/api/settings/adb/install', local_only(adb_install)),

@@ -47,6 +47,18 @@ nav a.on svg { color: var(--accent); opacity: 1; }
 .side-foot .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 
 main { overflow-y: auto; padding: 34px 40px 60px; scroll-behavior: smooth; }
+/* выбор устройства */
+.devbar { max-width: 680px; margin: 0 0 30px; }
+.devbar .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.devbar .chips > span { color: var(--dim); font-size: 13px; margin-right: 4px; }
+.devbar button.dev { background: var(--card-hi); border: 1.5px solid transparent; color: var(--text); border-radius: 999px;
+  padding: 7px 14px; font: inherit; font-size: 13px; cursor: pointer; }
+.devbar button.dev.on { border-color: var(--accent); background: var(--accent-soft); }
+.devbar button.dev i { font-style: normal; color: var(--faint); margin-left: 6px; font-size: 12px; }
+.devbar .devcard { margin-top: 12px; }
+.devbar .devcard[hidden] { display: none; }
+.row.own .t b::after { content: 'своё'; margin-left: 8px; font-size: 11px; font-weight: 500; color: var(--accent);
+  background: var(--accent-soft); border-radius: 6px; padding: 1px 6px; vertical-align: 1px; }
 section { max-width: 680px; margin-bottom: 44px; scroll-margin-top: 24px; }
 h1 { font: 700 26px/1.2 'Inter Display', sans-serif; letter-spacing: -.02em; margin: 0 0 4px; }
 .lead { color: var(--dim); margin: 0 0 18px; }
@@ -224,6 +236,22 @@ a.btn { color: var(--text); text-decoration: none; }
   </aside>
 
   <main id="main">
+    <div class="devbar" id="devbar" hidden>
+      <div class="chips" id="devChips"></div>
+      <div class="card devcard" id="devCard" hidden>
+        <div class="row">
+          <div class="t"><b>Название</b><small id="devInfo"></small></div>
+          <input class="field wfield short" id="devName" maxlength="40" placeholder="Например, кухня">
+        </div>
+        <div class="row">
+          <div class="t"><b>Свои настройки</b><small id="devOwn">Пока всё как у остальных. Поменяй что угодно ниже — изменится только на этом устройстве</small></div>
+          <button class="btn" id="devReset">Сделать как у всех</button>
+        </div>
+        <div class="row sub">
+          <div class="note">Своими у устройства могут быть экран трека, часы и фон, виджеты, будильник и визуализатор. Погода, календарь, папки с фото и сама программа — общие.</div>
+        </div>
+      </div>
+    </div>
     <section id="track">
       <h1>Экран трека</h1>
       <p class="lead">Что видно за обложкой и текстом, пока играет музыка. Всё применяется сразу — смотри на планшет.</p>
@@ -274,6 +302,12 @@ a.btn { color: var(--text); text-decoration: none; }
         <div class="row">
           <div class="t"><b>Свечение под музыку</b><small>За обложкой мягкое свечение её цвета, оно «дышит» в такт</small></div>
           <label class="sw"><input type="checkbox" data-key="pulse"><i></i></label>
+        </div>
+        <div class="row">
+          <div class="t"><b>Визуализатор</b><small>Внизу экрана трека прыгают полосы частот того, что играет комп</small></div>
+          <div class="seg">
+            <button data-vis="off">Выкл</button><button data-vis="bars">Полоски</button><button data-vis="wave">Волна</button><button data-vis="dots">Точки</button>
+          </div>
         </div>
         <div class="row">
           <div class="t"><b>Тень под обложкой</b><small>Мягкая тень, обложка будто чуть приподнята</small></div>
@@ -521,8 +555,10 @@ async function api(path, opts = {}) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+let DEV = '';   // какое устройство настраиваем ('' — все)
+const settingsUrl = () => '/api/settings' + (DEV ? '?device=' + encodeURIComponent(DEV) : '');
 async function save(changes) {
-  try { render(await api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes) })); toast('Сохранено'); }
+  try { render(await api(settingsUrl(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes) })); toast('Сохранено'); }
   catch (e) { toast('Не сохранилось: ' + e.message); }
 }
 
@@ -541,8 +577,54 @@ function mediaPreview(box, m) {
   box.append(media);
 }
 
+function renderDevices(st) {
+  const list = st.devices || [];
+  $('#devbar').hidden = !list.length;
+  const chips = $('#devChips');
+  const key = JSON.stringify([DEV, list.map(d => [d.id, d.name, d.custom.length])]);
+  if (chips.dataset.key !== key) {
+    chips.dataset.key = key;
+    chips.textContent = '';
+    chips.append(el('span', null, 'Настраиваю'));
+    const add = (id, name, own) => {
+      const b = el('button', 'dev' + (DEV === id ? ' on' : ''), name);
+      if (own) b.append(el('i', null, 'своё'));
+      b.addEventListener('click', () => { DEV = id; refresh(); });
+      chips.append(b);
+    };
+    add('', 'Все устройства', false);
+    for (const d of list) add(d.id, d.name, d.custom.length > 0);
+  }
+  const d = list.find(x => x.id === DEV);
+  $('#devCard').hidden = !d;
+  if (d) {
+    if (document.activeElement !== $('#devName')) $('#devName').value = d.name;
+    const ago = d.seen == null ? '' : d.seen < 30 ? 'на связи' : 'был ' + (d.seen < 3600 ? Math.round(d.seen / 60) + ' мин назад' : Math.round(d.seen / 3600) + ' ч назад');
+    $('#devInfo').textContent = [d.model, d.ip, d.version && 'приложение ' + d.version, ago].filter(Boolean).join(', ');
+    $('#devOwn').textContent = d.custom.length ? 'Своё у этого устройства отмечено ниже словом «своё»'
+      : 'Пока всё как у остальных. Поменяй что угодно ниже — изменится только на этом устройстве';
+    $('#devReset').disabled = !d.custom.length;
+  }
+  const own = new Set(d ? d.custom : []);
+  for (const r of $$('.row.own')) r.classList.remove('own');
+  for (const e of $$('[data-key]')) if (own.has(e.dataset.key)) e.closest('.row')?.classList.add('own');
+  if (own.has('theme')) $('.theme')?.closest('.row')?.classList.add('own');
+  if (own.has('track_bg')) $('.mode')?.closest('.row')?.classList.add('own');
+  if (own.has('widget_layout')) $('.lay')?.closest('.row')?.classList.add('own');
+  if (own.has('widget_style')) $('[data-wstyle]')?.closest('.row')?.classList.add('own');
+  if (own.has('widget_slots')) $('#slots')?.closest('.row')?.classList.add('own');
+  if (own.has('visualizer')) $('[data-vis]')?.closest('.row')?.classList.add('own');
+  if (own.has('alarm_time')) $('#alarmTime')?.closest('.row')?.classList.add('own');
+  if (own.has('alarm_days')) $('#alarmDays')?.closest('.row')?.classList.add('own');
+}
+
 function render(st) {
+  if ((st.device || '') !== DEV) {
+    if (!(st.devices || []).some(d => d.id === DEV)) DEV = '';   // устройство забыли — смотрим общие
+    else { refresh(); return; }                               // ответ на общий запрос, а смотрим устройство
+  }
   S = st;
+  renderDevices(st);
   const s = st.settings;
   $('#ver').textContent = 'версия ' + st.version;
   for (const el of $$('[data-key]')) {
@@ -580,6 +662,7 @@ function render(st) {
     : 'Подложка под каждым виджетом, тонкий контур или только линия сверху';
   renderSlots(s);
   for (const b of $$('[data-fmode]')) b.classList.toggle('on', b.dataset.fmode === s.forecast_mode);
+  for (const b of $$('[data-vis]')) b.classList.toggle('on', b.dataset.vis === s.visualizer);
   const used = s.widget_slots.slice(0, slotCount(s));
   for (const r of $$('[data-for]')) r.hidden = !used.includes(r.dataset.for);
   if (document.activeElement !== $('#city2Input')) $('#city2Input').value = s.city_name;
@@ -706,6 +789,7 @@ function renderSlots(s) {
 for (const b of $$('.lay')) b.addEventListener('click', () => save({ widget_layout: b.dataset.layout }));
 for (const b of $$('[data-wstyle]')) b.addEventListener('click', () => save({ widget_style: b.dataset.wstyle }));
 for (const b of $$('[data-fmode]')) b.addEventListener('click', () => save({ forecast_mode: b.dataset.fmode }));
+for (const b of $$('[data-vis]')) b.addEventListener('click', () => save({ visualizer: b.dataset.vis }));
 $('#cdTitle').addEventListener('change', e => save({ countdown_title: e.target.value.trim() }));
 $('#cdDate').addEventListener('change', e => save({ countdown_date: e.target.value }));
 $('#noteText').addEventListener('change', e => save({ note_text: e.target.value.trim() }));
@@ -714,6 +798,14 @@ $('#alarmTime').addEventListener('change', e => { if (e.target.value) save({ ala
 for (const b of $$('[data-day]')) b.addEventListener('click', () => {
   const d = b.dataset.day, cur = S.settings.alarm_days;
   save({ alarm_days: cur.includes(d) ? cur.replace(d, '') : cur + d });
+});
+$('#devName').addEventListener('change', async e => {
+  render(await api('/api/settings/device/' + DEV + '/rename?device=' + DEV, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: e.target.value }) }));
+  toast('Сохранено');
+});
+$('#devReset').addEventListener('click', async () => {
+  render(await api('/api/settings/device/' + DEV + '/reset?device=' + DEV, { method: 'POST' }));
+  toast('Теперь как у всех');
 });
 $('#framePick').addEventListener('click', async () => {
   $('#framePick').textContent = 'Выбираю…';
@@ -800,7 +892,7 @@ $('#main').addEventListener('scroll', () => {
   for (const a of links) a.classList.toggle('on', a.getAttribute('href') === '#' + cur);
 });
 
-async function refresh() { try { render(await api('/api/settings')); } catch (e) {} }
+async function refresh() { try { render(await api(settingsUrl())); } catch (e) {} }
 refresh();
 setInterval(refresh, 3000);
 </script>

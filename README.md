@@ -43,7 +43,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-2.0.apk` for the tablet.
+- `NowPlaying-2.1.apk` for the tablet.
 
 ### 1. Server on the PC
 
@@ -70,7 +70,7 @@ Tray menu (right-click the icon):
 
 ### 2. App on the tablet
 
-Copy `NowPlaying-2.0.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
+Copy `NowPlaying-2.1.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
 
 Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on its own** and starts showing your music. If it doesn't, long-press the screen and enter the address shown in the tray menu on the PC.
 
@@ -85,6 +85,8 @@ Click the tray icon (or «Настройки…» in its menu) to open the setti
 - **Photo frame:** photos from any folder on the PC change under the clock (every minute, 5, 15, 30 minutes or an hour).
 - **Sunrise alarm:** the tablet rings, and 10–30 minutes before that the screen slowly brightens from deep red to warm yellow. Pick the days; it can also start the music on the PC when it rings.
 - **Resume:** when music is paused, the clock shows a card with the last track's cover and title. Tap it to keep playing.
+- **Visualizer:** frequency bands of whatever the PC plays bounce at the bottom of the track screen, in the cover's color. Three looks: bars, wave, dots.
+- **Several screens:** one PC can feed several tablets or phones. Each shows up in the settings window on its own, and can get its own track screen, clock, widgets, alarm and visualizer.
 - **Wake on LAN:** when the PC is off, the clock shows a «Включить компьютер» (turn on the computer) button. It works when the PC is connected to the router by cable and waking from the network is allowed in the BIOS and in the network card's power settings.
 - **Tablet:** is it online, and installing the app over adb by USB or Wi-Fi. If adb isn't installed, the window offers to download Google's official platform-tools (about 7 MB).
 - **Program:** automatic updates.

@@ -54,7 +54,7 @@ class Weather:
     def wanted(self):
         """Погода нужна под датой или в виджете «Погода сейчас»."""
         s = self.settings
-        return s['weather'] or 'weather' in s['widget_slots'] or 'forecast' in s['widget_slots']
+        return s.anywhere(lambda v: v['weather'] or 'weather' in v['widget_slots'] or 'forecast' in v['widget_slots'])
 
     def info(self):
         s = self.settings
@@ -64,7 +64,7 @@ class Weather:
 
     def forecast_info(self):
         s = self.settings
-        if 'forecast' not in s['widget_slots'] or self.place != (s['weather_lat'], s['weather_lon']):
+        if not s.anywhere(lambda v: 'forecast' in v['widget_slots']) or self.place != (s['weather_lat'], s['weather_lon']):
             return None
         return self.forecast
 

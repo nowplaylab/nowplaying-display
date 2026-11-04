@@ -7,6 +7,7 @@ import json
 import re
 import os
 import threading
+import time
 
 import calendar_ics
 import widgets
@@ -19,6 +20,7 @@ DEFAULTS = {
     'track_dim': 55,          # затемнение видео или своего фона за треком, %
     'shadow': True,           # тень под обложкой
     'pulse': True,            # свечение за обложкой «дышит» под музыку
+    'visualizer': 'off',      # полосы частот внизу экрана трека: off, bars, wave, dots
     # экран часов
     'frame_on': False,             # фоторамка: фото из папки по очереди вместо своего фона
     'frame_dir': '',
@@ -57,8 +59,14 @@ DEFAULTS = {
 }
 
 # то, что нужно планшету
-UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume',
+UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'visualizer', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume',
            'alarm_on', 'alarm_time', 'alarm_days', 'alarm_sunrise', 'alarm_music')
+
+
+# что можно задать каждому устройству отдельно; остальное (погода, календарь, папки, программа) — общее
+DEVICE_KEYS = UI_KEYS + ('video_fallback', 'clock_bg', 'frame_on', 'weather', 'wol',
+                         'widget_layout', 'widget_style', 'widget_slots', 'forecast_mode')
+SEEN_SAVE_EVERY = 300
 
 
 class Settings:
@@ -68,6 +76,14 @@ class Settings:
         self.lock = threading.Lock()
         self.data = dict(DEFAULTS)
         self.listeners = []
+        self.devices_path = os.path.join(os.path.dirname(self.path), 'devices.json')
+        self.devices = {}   # id -> {'name', 'model', 'ip', 'seen', 'version', 'over': {…}}
+        self._devices_saved = 0
+        try:
+            with open(self.devices_path, encoding='utf-8') as f:
+                self.devices = {k: v for k, v in json.load(f).items() if isinstance(v, dict)}
+        except (OSError, ValueError):
+            pass
         try:
             with open(self.path, encoding='utf-8') as f:
                 saved = json.load(f)
@@ -86,8 +102,121 @@ class Settings:
     def ui(self):
         return {k: self.data[k] for k in UI_KEYS}
 
+    # ---------- несколько экранов ----------
+
+    def view(self, dev=None):
+        """Настройки глазами одного устройства: общие, поверх — его собственные."""
+        with self.lock:
+            out = dict(self.data)
+            d = self.devices.get(dev) if dev else None
+            if d:
+                out.update({k: v for k, v in d.get('over', {}).items() if k in DEVICE_KEYS})
+        return out
+
+    def ui_for(self, dev=None):
+        v = self.view(dev)
+        return {k: v[k] for k in UI_KEYS}
+
+    def anywhere(self, test):
+        """Нужно ли что-то хоть одному устройству (или общим настройкам) — например, погода для виджета."""
+        if test(self.view()):
+            return True
+        return any(test(self.view(dev)) for dev in list(self.devices))
+
+    def seen(self, dev, model, ip, version):
+        """Устройство спросило /api/now: запомнить его (и сохранить на диск не чаще раза в 5 минут)."""
+        now = time.time()
+        with self.lock:
+            d = self.devices.get(dev)
+            new = d is None
+            if new:
+                d = self.devices[dev] = {'name': '', 'over': {}}
+            d.update(model=model[:60], ip=ip, seen=now, version=version[:20])
+            due = new or now - self._devices_saved > SEEN_SAVE_EVERY
+        if due:
+            self._save_devices()
+
+    def device_list(self):
+        with self.lock:
+            items = [(k, dict(v)) for k, v in self.devices.items()]
+        out = []
+        for k, v in sorted(items, key=lambda kv: -kv[1].get('seen', 0)):
+            out.append({'id': k, 'name': v.get('name') or v.get('model') or 'Устройство', 'model': v.get('model', ''),
+                        'ip': v.get('ip', ''), 'seen': int(time.time() - v['seen']) if v.get('seen') else None,
+                        'version': v.get('version', ''), 'custom': sorted(v.get('over', {}))})
+        return out
+
+    def update_device(self, dev, changes):
+        """Свои настройки устройства: только DEVICE_KEYS, остальное уходит в общие."""
+        if dev not in self.devices:
+            return self.update(changes)
+        own = {k: v for k, v in changes.items() if k in DEVICE_KEYS}
+        rest = {k: v for k, v in changes.items() if k not in DEVICE_KEYS}
+        if rest:
+            self.update(rest)
+        clean = self._clean(own)
+        with self.lock:
+            self.devices[dev].setdefault('over', {}).update(clean)
+        self._save_devices()
+        self._notify()
+        return self.view(dev)
+
+    def reset_device(self, dev):
+        with self.lock:
+            if dev in self.devices:
+                self.devices[dev]['over'] = {}
+        self._save_devices()
+        self._notify()
+
+    def rename_device(self, dev, name):
+        with self.lock:
+            if dev in self.devices:
+                self.devices[dev]['name'] = str(name).strip()[:40]
+        self._save_devices()
+
+    def forget_device(self, dev):
+        with self.lock:
+            self.devices.pop(dev, None)
+        self._save_devices()
+        self._notify()
+
+    def _save_devices(self):
+        with self.lock:
+            snapshot = json.loads(json.dumps(self.devices))
+            self._devices_saved = time.time()
+        try:
+            os.makedirs(os.path.dirname(self.devices_path), exist_ok=True)
+            tmp = self.devices_path + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(snapshot, f, ensure_ascii=False, indent=1)
+            os.replace(tmp, self.devices_path)
+        except OSError:
+            pass
+
+    def _notify(self):
+        snapshot = self.get()
+        for fn in self.listeners:
+            fn(snapshot)
+
     def update(self, changes):
         """Применить изменения (лишние ключи и неверные типы отбрасываются). Возвращает новые настройки."""
+        clean = self._clean(changes)
+        with self.lock:
+            self.data.update(clean)
+            snapshot = dict(self.data)
+            try:
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                tmp = self.path + '.tmp'
+                with open(tmp, 'w', encoding='utf-8') as f:
+                    json.dump(snapshot, f, ensure_ascii=False, indent=1)
+                os.replace(tmp, self.path)
+            except OSError:
+                pass
+        for fn in self.listeners:
+            fn(snapshot)
+        return snapshot
+
+    def _clean(self, changes):
         clean = {}
         for k, v in changes.items():
             if k not in DEFAULTS:
@@ -131,6 +260,8 @@ class Settings:
             clean['alarm_days'] = ''.join(d for d in '1234567' if d in clean['alarm_days'])
         if clean.get('alarm_sunrise', 20) not in (0, 10, 20, 30):
             clean.pop('alarm_sunrise')
+        if clean.get('visualizer', 'off') not in ('off', 'bars', 'wave', 'dots'):
+            clean.pop('visualizer')
         if clean.get('frame_every', 5) not in (1, 5, 15, 30, 60):
             clean.pop('frame_every')
         if 'calendar_url' in clean:
@@ -149,17 +280,4 @@ class Settings:
                           ('night_to', 0, 23), ('dark_after_min', 0, 720)):
             if k in clean:
                 clean[k] = max(lo, min(hi, clean[k]))
-        with self.lock:
-            self.data.update(clean)
-            snapshot = dict(self.data)
-            try:
-                os.makedirs(os.path.dirname(self.path), exist_ok=True)
-                tmp = self.path + '.tmp'
-                with open(tmp, 'w', encoding='utf-8') as f:
-                    json.dump(snapshot, f, ensure_ascii=False, indent=1)
-                os.replace(tmp, self.path)
-            except OSError:
-                pass
-        for fn in self.listeners:
-            fn(snapshot)
-        return snapshot
+        return clean

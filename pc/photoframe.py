@@ -59,7 +59,7 @@ class PhotoFrame:
             loop.call_soon_threadsafe(self.wake.set)
 
     def active(self):
-        return self.settings['frame_on'] and bool(self.settings['frame_dir'])
+        return bool(self.settings['frame_dir']) and self.settings.anywhere(lambda v: v['frame_on'])
 
     def info(self):
         c = self.current

@@ -156,6 +156,8 @@ public class MainActivity extends Activity {
     // свечение за обложкой, «дышит» под музыку (уровень звука ПК идёт потоком с /api/pulse)
     private View glow;
     private GradientDrawable glowDrawable;
+    private VisualizerView visualizer;
+    private volatile String visStyle = "off";   // визуализатор: off, bars, wave, dots
     private volatile boolean pulseOn, playerShown;   // pulseOn — только если сервер его знает (1.7+)
     private volatile float pulseLevel;
     private float glowShown;
@@ -221,6 +223,7 @@ public class MainActivity extends Activity {
         final int gen = ++generation;
         new Thread(new Runnable() { public void run() { networkLoop(gen); } }, "np-net").start();
         new Thread(new Runnable() { public void run() { pulseLoop(gen); } }, "np-pulse").start();
+        new Thread(new Runnable() { public void run() { bandsLoop(gen); } }, "np-bands").start();
         ui.post(ticker);
         ui.post(clockTick);
         ui.post(glowTick);
@@ -441,6 +444,9 @@ public class MainActivity extends Activity {
         glow.setVisibility(View.GONE);
         root.addView(glow, new FrameLayout.LayoutParams(-1, -1));
 
+        visualizer = new VisualizerView(this);   // под обложкой и текстом, поверх фона
+        visualizer.setVisibility(View.GONE);
+        root.addView(visualizer, new FrameLayout.LayoutParams(-1, dp(150), Gravity.BOTTOM));
         root.addView(player, new FrameLayout.LayoutParams(-1, -1));
         applyTheme("classic");
 
@@ -606,6 +612,20 @@ public class MainActivity extends Activity {
                 }
             }
         });
+    }
+
+    private String devId;
+
+    /** Постоянный номер этого устройства — чтобы на ПК у каждого экрана были свои настройки. */
+    private String deviceId() {
+        if (devId == null) {
+            devId = prefs.getString("dev_id", null);
+            if (devId == null) {
+                devId = Long.toHexString(new Random().nextLong() & 0xffffffffffffL);
+                prefs.edit().putString("dev_id", devId).commit();
+            }
+        }
+        return devId;
     }
 
     private String myVersion() {
@@ -1535,12 +1555,16 @@ public class MainActivity extends Activity {
         best[2] = 0.95f;
         int c = Color.HSVToColor(best);
         glowDrawable.setColors(new int[]{(c & 0x00ffffff) | 0x99000000, c & 0x00ffffff});
+        visualizer.setColor(c);
     }
 
     /** 25 раз в секунду: прозрачность свечения по уровню звука (с лёгким сглаживанием). */
     private final Runnable glowTick = new Runnable() {
         public void run() {
             vinyl.setSpinning("vinyl".equals(theme) && playerShown && playing && dark.getVisibility() != View.VISIBLE);
+            boolean vis = !"off".equals(visStyle) && playerShown && playing && dark.getVisibility() != View.VISIBLE;
+            if (vis != (visualizer.getVisibility() == View.VISIBLE)) visualizer.setVisibility(vis ? View.VISIBLE : View.GONE);
+            visualizer.setRunning(vis);
             boolean on = pulseOn && playerShown && playing && dark.getVisibility() != View.VISIBLE;
             if (on) {
                 float target = pulseLevel;
@@ -1583,6 +1607,34 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Держит открытым поток /api/bands (полосы частот), пока визуализатор на экране. */
+    private void bandsLoop(int gen) {
+        while (running && gen == generation) {
+            String s = server;
+            if ("off".equals(visStyle) || !playerShown || !playing || s == null) {
+                SystemClock.sleep(1000);
+                continue;
+            }
+            HttpURLConnection c = null;
+            try {
+                c = (HttpURLConnection) new URL("http://" + s + "/api/bands").openConnection();
+                c.setConnectTimeout(3000);
+                c.setReadTimeout(5000);
+                java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream()));
+                String line;
+                while (running && gen == generation && !"off".equals(visStyle) && playerShown && playing
+                        && (line = r.readLine()) != null) {
+                    visualizer.setLine(line);
+                }
+            } catch (Exception e) {
+                SystemClock.sleep(2000);   // сервер старый (нет /api/bands) или нет связи
+            } finally {
+                if (c != null) c.disconnect();
+            }
+            visualizer.clear();
+        }
+    }
+
     private static int dimColor(int percent) {
         return Color.argb(Math.round(percent * 2.55f), 0, 0, 0);
     }
@@ -1596,6 +1648,8 @@ public class MainActivity extends Activity {
         trackBgMode = mode;
         trackDim = u.optInt("track_dim", 55);
         resumeOn = u.optBoolean("resume", true);
+        visStyle = u.optString("visualizer", "off");
+        visualizer.setStyle(visStyle);
         alarmOn = u.optBoolean("alarm_on", false);
         alarmMusic = u.optBoolean("alarm_music", false);
         alarmSunriseMin = u.optInt("alarm_sunrise", 20);
@@ -2056,7 +2110,8 @@ public class MainActivity extends Activity {
                 prefs.edit().putString("server", s).commit();
             }
             try {
-                final JSONObject now = new JSONObject(new String(get("http://" + s + "/api/now?v=" + myVersion(), 3000), "UTF-8"));
+                final JSONObject now = new JSONObject(new String(get("http://" + s + "/api/now?v=" + myVersion()
+                        + "&dev=" + deviceId() + "&name=" + java.net.URLEncoder.encode(android.os.Build.MODEL, "UTF-8"), 3000), "UTF-8"));
                 failures = 0;
                 ui.post(new Runnable() { public void run() { apply(now); } });
                 setStatus("");

@@ -84,7 +84,7 @@ class Calendar:
 
     def wanted(self):
         s = self.settings
-        return 'calendar' in s['widget_slots'] and bool(s['calendar_url'])
+        return bool(s['calendar_url']) and s.anywhere(lambda v: 'calendar' in v['widget_slots'])
 
     def info(self):
         if not self.wanted() or self.url != self.settings['calendar_url']:
