@@ -43,7 +43,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-1.12.apk` for the tablet.
+- `NowPlaying-1.13.apk` for the tablet.
 
 ### 1. Server on the PC
 
@@ -70,7 +70,7 @@ Tray menu (right-click the icon):
 
 ### 2. App on the tablet
 
-Copy `NowPlaying-1.12.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
+Copy `NowPlaying-1.13.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
 
 Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on its own** and starts showing your music. If it doesn't, long-press the screen and enter the address shown in the tray menu on the PC.
 
@@ -102,6 +102,7 @@ Every 6 hours the server checks the [latest release](../../releases/latest) on G
 | Swipe right | previous track |
 | Long press | enter the PC address manually |
 | Tap «Включить компьютер» | wake the PC over the network (Wake on LAN) |
+| Tap the clock screen | timer: pick minutes; while it runs, pause, add 1 or 5 minutes, or reset |
 | Drag up/down on the cover | PC volume |
 | Drag up/down on the lyrics | scroll the lyrics; after 3 s they return to the current line |
 | Tap a line while the lyrics are scrolled | jump to that line (synced lyrics only) |

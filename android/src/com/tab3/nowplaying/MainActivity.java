@@ -18,6 +18,9 @@ import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.TransitionDrawable;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
+import android.media.RingtoneManager;
 import android.net.DhcpInfo;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
@@ -169,6 +172,18 @@ public class MainActivity extends Activity {
     // Wake on LAN: адрес сетевой карты ПК запоминаем, пока он на связи, и будим его, когда пропал
     private String wolMac, wolName = "";
     private boolean wolOn;
+    // ---- таймер: живёт на планшете, переживает перезапуск приложения (время конца — в prefs) ----
+    private static final int[] TIMER_PRESETS = {3, 5, 10, 15, 20, 30, 45, 60};
+    private static final long RING_MAX_MS = 90000;
+    private long timerEnd;          // когда зазвонит (часы планшета, мс); 0 — не идёт
+    private long timerLeft;         // сколько осталось, пока на паузе; 0 — не на паузе
+    private boolean ringing;
+    private long ringStarted, panelUntil;
+    private LinearLayout timerPanel;
+    private TextView timerPill, ringView;
+    private MediaPlayer ringPlayer;
+    private int ringVolumeWas = -1;   // громкость будильника до звонка — вернём, когда выключат
+    private final SimpleDateFormat endFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
     private WidgetView resumeView;
     private Bitmap coverBmp;              // последняя обложка — для карточки «Продолжить»
     private boolean resumeOn = true;
@@ -283,7 +298,15 @@ public class MainActivity extends Activity {
                 return true;
             }
             @Override public boolean onSingleTapUp(MotionEvent e) {
+                if (ringing) {
+                    stopRing();
+                    return true;
+                }
                 if (wakeFromDark()) return true;
+                if (timerPanel.getVisibility() == View.VISIBLE) {   // тап мимо кнопок — закрыть панель
+                    hideTimerPanel();
+                    return true;
+                }
                 if (idleBox.getVisibility() == View.VISIBLE && resumeView.getVisibility() == View.VISIBLE && inside(resumeView, e)) {
                     long now = SystemClock.elapsedRealtime();
                     if (now > resumeUntil && !playing) {
@@ -295,6 +318,10 @@ public class MainActivity extends Activity {
                 }
                 if (idleBox.getVisibility() == View.VISIBLE && wolView.getVisibility() == View.VISIBLE && inside(wolView, e)) {
                     if (wolState != WidgetView.WOL_WAKING) wakePc();
+                    return true;
+                }
+                if (idleBox.getVisibility() == View.VISIBLE) {
+                    showTimerPanel();
                     return true;
                 }
                 if (player.getVisibility() == View.VISIBLE && lyrics.isBrowsing() && inside(lyrics, e)) {
@@ -482,6 +509,35 @@ public class MainActivity extends Activity {
         flashIcon.setTypeface(Typeface.DEFAULT_BOLD); // значков ▶ ❚❚ в Inter нет
         flashIcon.setAlpha(0f);
         root.addView(flashIcon, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+
+        timerPill = text(20, false, 255);
+        timerPill.setTypeface(fontSemiBold);
+        timerPill.setPadding(dp(16), dp(7), dp(16), dp(8));
+        timerPill.setVisibility(View.GONE);
+        timerPill.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showTimerPanel(); } });
+        FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT);
+        pp.topMargin = dp(18);
+        pp.rightMargin = dp(18);
+        root.addView(timerPill, pp);
+
+        timerPanel = new LinearLayout(this);
+        timerPanel.setOrientation(LinearLayout.HORIZONTAL);
+        timerPanel.setGravity(Gravity.CENTER_VERTICAL);
+        timerPanel.setPadding(dp(14), dp(12), dp(14), dp(12));
+        timerPanel.setClickable(true);   // касания по самой панели не уходят дальше
+        hideTimerPanel();
+        FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        tp.bottomMargin = dp(28);
+        root.addView(timerPanel, tp);
+
+        ringView = text(64, true, 255);
+        ringView.setGravity(Gravity.CENTER);
+        ringView.setBackgroundColor(0xe6000000);
+        ringView.setVisibility(View.GONE);
+        root.addView(ringView, new FrameLayout.LayoutParams(-1, -1));
+
+        timerEnd = prefs.getLong("timer_end", 0);
+        timerLeft = prefs.getLong("timer_left", 0);
 
         dark = new View(this);
         dark.setBackgroundColor(0xff000000);
@@ -1033,7 +1089,8 @@ public class MainActivity extends Activity {
      *  30 минут без музыки — чёрный экран с минимальной подсветкой (тап будит на минуту). */
     private void updateScreen(boolean idleNow, long t) {
         boolean night = isNight();
-        boolean darkNow = idleNow && darkAfterMs > 0 && t - idleSince > darkAfterMs && t > wakeUntil;
+        boolean darkNow = idleNow && darkAfterMs > 0 && t - idleSince > darkAfterMs && t > wakeUntil
+                && !timerActive() && !ringing;
         dark.setVisibility(darkNow ? View.VISIBLE : View.GONE);
         if (nightShown == null || nightShown != night) {
             // ночью часы тёмно-красные (не слепят и не светят в комнату), фон затемнён сильнее
@@ -1044,11 +1101,13 @@ public class MainActivity extends Activity {
             bgDim.setBackgroundColor(night ? 0xd9000000 : dimColor(clockDim));
             for (WidgetView w : slotViews) w.setNight(night);
             wolView.setNight(night);
+            styleTimer(night);
         }
         syncBgVideo(idleNow && !darkNow);
         syncClip(!idleNow && !darkNow);
         float b;
-        if (darkNow) b = 0.0f;
+        if (ringing) b = night ? 0.2f : 0.7f;
+        else if (darkNow) b = 0.0f;
         else if (idleNow) b = night ? 0.02f : (bgReady ? 0.35f : 0.15f);  // с фоном днём ярче, иначе его не видно
         else b = night ? 0.10f : -1f;    // -1 — яркость, выбранная в настройках
         if (b != appliedBrightness) {
@@ -1056,6 +1115,205 @@ public class MainActivity extends Activity {
             lp.screenBrightness = b;
             getWindow().setAttributes(lp);
             appliedBrightness = b;
+        }
+    }
+
+    // ---------------- таймер ----------------
+
+    private boolean timerActive() { return timerEnd > 0 || timerLeft > 0; }
+
+    private long timerRemaining() {
+        return timerLeft > 0 ? timerLeft : Math.max(0, timerEnd - System.currentTimeMillis());
+    }
+
+    /** 4:59, 12:00, 1:05:00 — секунды округляем вверх, чтобы 0:00 совпало со звонком. */
+    private static String fmtLeft(long ms) {
+        long s = (ms + 999) / 1000, h = s / 3600, m = s / 60 % 60, sec = s % 60;
+        return h > 0 ? String.format(Locale.US, "%d:%02d:%02d", h, m, sec) : String.format(Locale.US, "%d:%02d", m, sec);
+    }
+
+    private void saveTimer() {
+        prefs.edit().putLong("timer_end", timerEnd).putLong("timer_left", timerLeft).commit();
+        clockTickNow();
+    }
+
+    private void clockTickNow() {
+        ui.removeCallbacks(clockTick);
+        clockTick.run();
+    }
+
+    private void startTimer(int minutes) {
+        timerEnd = System.currentTimeMillis() + minutes * 60000L;
+        timerLeft = 0;
+        saveTimer();
+        hideTimerPanel();
+        flash(minutes + " мин");
+    }
+
+    private void addTimer(int minutes) {
+        if (timerLeft > 0) timerLeft += minutes * 60000L;
+        else timerEnd += minutes * 60000L;
+        saveTimer();
+        showTimerPanel();
+    }
+
+    private void pauseTimer() {
+        if (timerLeft > 0) {
+            timerEnd = System.currentTimeMillis() + timerLeft;
+            timerLeft = 0;
+        } else {
+            timerLeft = Math.max(1000, timerRemaining());
+            timerEnd = 0;
+        }
+        saveTimer();
+        showTimerPanel();
+    }
+
+    private void resetTimer() {
+        timerEnd = timerLeft = 0;
+        saveTimer();
+        hideTimerPanel();
+    }
+
+    private TextView chip(String label, View.OnClickListener click) {
+        TextView c = text(22, false, 255);
+        c.setText(label);
+        c.setGravity(Gravity.CENTER);
+        c.setPadding(dp(20), dp(11), dp(20), dp(12));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(30));
+        c.setBackgroundDrawable(bg);
+        c.setOnClickListener(click);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
+        lp.leftMargin = lp.rightMargin = dp(5);
+        c.setLayoutParams(lp);
+        return c;
+    }
+
+    /** Панель внизу: без таймера — сколько минут поставить; с таймером — пауза, добавить, сбросить. */
+    private void showTimerPanel() {
+        timerPanel.removeAllViews();
+        TextView title = text(18, false, 170);
+        title.setText(timerActive() ? "Таймер" : "Таймер, минут");
+        title.setPadding(dp(8), 0, dp(10), 0);
+        timerPanel.addView(title);
+        if (!timerActive()) {
+            for (final int m : TIMER_PRESETS) {
+                timerPanel.addView(chip(String.valueOf(m), new View.OnClickListener() {
+                    public void onClick(View v) { startTimer(m); }
+                }));
+            }
+        } else {
+            timerPanel.addView(chip(timerLeft > 0 ? "Дальше" : "Пауза", new View.OnClickListener() {
+                public void onClick(View v) { pauseTimer(); }
+            }));
+            timerPanel.addView(chip("+1 мин", new View.OnClickListener() {
+                public void onClick(View v) { addTimer(1); }
+            }));
+            timerPanel.addView(chip("+5 мин", new View.OnClickListener() {
+                public void onClick(View v) { addTimer(5); }
+            }));
+            timerPanel.addView(chip("Сбросить", new View.OnClickListener() {
+                public void onClick(View v) { resetTimer(); }
+            }));
+        }
+        styleTimer(nightShown != null && nightShown);
+        timerPanel.setVisibility(View.VISIBLE);
+        setWidgetsAlpha(0f);   // панель встаёт на место виджетов
+        panelUntil = SystemClock.elapsedRealtime() + 8000;
+    }
+
+    private void hideTimerPanel() {
+        timerPanel.setVisibility(View.GONE);
+        setWidgetsAlpha(1f);
+    }
+
+    private void setWidgetsAlpha(float a) {
+        for (WidgetView w : slotViews) if (w != null) w.setAlpha(a);
+        if (wolView != null) wolView.setAlpha(a);
+        if (resumeView != null) resumeView.setAlpha(a);
+    }
+
+    private void styleTimer(boolean night) {
+        int fg = night ? 0xffa3281e : 0xffffffff;
+        GradientDrawable panel = new GradientDrawable();
+        panel.setCornerRadius(dp(36));
+        panel.setColor(night ? 0xf2000000 : 0xeb161618);
+        timerPanel.setBackgroundDrawable(panel);
+        for (int i = 0; i < timerPanel.getChildCount(); i++) {
+            TextView c = (TextView) timerPanel.getChildAt(i);
+            if (i == 0) {
+                c.setTextColor(night ? 0xb3a3281e : 0xb3ffffff);
+                continue;
+            }
+            c.setTextColor(fg);
+            ((GradientDrawable) c.getBackground()).setColor(night ? 0x33a3281e : 0x29ffffff);
+        }
+        GradientDrawable pill = new GradientDrawable();
+        pill.setCornerRadius(dp(22));
+        pill.setColor(night ? 0xcc000000 : 0x66000000);
+        timerPill.setBackgroundDrawable(pill);
+        timerPill.setTextColor(fg);
+        ringView.setTextColor(fg);
+    }
+
+    /** Раз в 100 мс: вовремя зазвонить, обновить плашку на экране трека, убрать забытую панель. */
+    private void updateTimer(long t) {
+        if (timerEnd > 0 && System.currentTimeMillis() >= timerEnd) ring();
+        if (ringing && t - ringStarted > RING_MAX_MS) stopRing();
+        boolean pill = timerActive() && player.getVisibility() == View.VISIBLE;
+        if (pill) timerPill.setText(fmtLeft(timerRemaining()));
+        if (pill != (timerPill.getVisibility() == View.VISIBLE)) timerPill.setVisibility(pill ? View.VISIBLE : View.GONE);
+        if (timerPanel.getVisibility() == View.VISIBLE && t > panelUntil) hideTimerPanel();
+    }
+
+    private void ring() {
+        timerEnd = timerLeft = 0;
+        saveTimer();
+        ringing = true;
+        ringStarted = SystemClock.elapsedRealtime();
+        hideTimerPanel();
+        android.text.SpannableString msg = new android.text.SpannableString("Время вышло\nнажми, чтобы выключить");
+        int cut = msg.toString().indexOf('\n');
+        msg.setSpan(new android.text.style.RelativeSizeSpan(0.36f), cut, msg.length(), 0);
+        msg.setSpan(new android.text.style.ForegroundColorSpan(nightShown != null && nightShown ? 0x99a3281e : 0x99ffffff),
+                cut, msg.length(), 0);
+        ringView.setText(msg);
+        ringView.setLineSpacing(dp(18), 1f);
+        ringView.setVisibility(View.VISIBLE);
+        try {
+            // звонок не должен быть беззвучным: поднимаем будильник хотя бы до 70% и потом возвращаем
+            AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+            int max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM), cur = am.getStreamVolume(AudioManager.STREAM_ALARM);
+            if (cur < max * 7 / 10) {
+                ringVolumeWas = cur;
+                am.setStreamVolume(AudioManager.STREAM_ALARM, max * 7 / 10, 0);
+            }
+            ringPlayer = new MediaPlayer();
+            android.net.Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            ringPlayer.setDataSource(this, uri);
+            ringPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
+            ringPlayer.setLooping(true);
+            ringPlayer.prepare();
+            ringPlayer.start();
+        } catch (Exception e) {
+            android.util.Log.w("NowPlaying", "ring: " + e);
+            if (ringPlayer != null) { ringPlayer.release(); ringPlayer = null; }
+        }
+    }
+
+    private void stopRing() {
+        ringing = false;
+        ringView.setVisibility(View.GONE);
+        if (ringPlayer != null) {
+            try { ringPlayer.stop(); } catch (Exception ignored) { }
+            ringPlayer.release();
+            ringPlayer = null;
+        }
+        if (ringVolumeWas >= 0) {
+            ((AudioManager) getSystemService(AUDIO_SERVICE)).setStreamVolume(AudioManager.STREAM_ALARM, ringVolumeWas, 0);
+            ringVolumeWas = -1;
         }
     }
 
@@ -1292,6 +1550,7 @@ public class MainActivity extends Activity {
             if (idleNow != (idleBox.getVisibility() == View.VISIBLE)) showIdle(idleNow);
             updateWol(t);
             updateResume(t);
+            updateTimer(t);
             if (!idleNow || idleSince == 0) idleSince = t;
             updateScreen(idleNow, t);
             ui.postDelayed(this, 100);
@@ -1301,9 +1560,14 @@ public class MainActivity extends Activity {
     private final Runnable clockTick = new Runnable() {
         public void run() {
             Date now = new Date();
-            clock.setText(clockFmt.format(now));
-            String d = dateFmt.format(now);
-            date.setText(d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1));
+            if (timerActive()) {
+                clock.setText(fmtLeft(timerRemaining()));
+                date.setText(timerLeft > 0 ? "Таймер на паузе" : "Таймер, звонок в " + endFmt.format(new Date(timerEnd)));
+            } else {
+                clock.setText(clockFmt.format(now));
+                String d = dateFmt.format(now);
+                date.setText(d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1));
+            }
             if (now.getSeconds() == 0) moveClock(); // раз в минуту часы переезжают — чтобы экран не выгорал
             if (now.getSeconds() == 0) for (WidgetView w : slotViews) w.invalidate();   // второй город, календарь
             ui.postDelayed(this, 1000 - System.currentTimeMillis() % 1000);
