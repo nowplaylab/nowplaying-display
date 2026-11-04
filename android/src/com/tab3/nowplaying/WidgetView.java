@@ -1,7 +1,11 @@
 package com.tab3.nowplaying;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
+import android.graphics.Shader;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
@@ -32,6 +36,11 @@ public class WidgetView extends View {
             small = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint icon = new Paint(Paint.ANTI_ALIAS_FLAG), iconLine = new Paint(Paint.ANTI_ALIAS_FLAG);
     private JSONArray cols;
+    private Bitmap art;
+    private String trackTitle = "", trackArtist = "";
+    private boolean pressed;
+    private final Paint artPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+    private final Matrix artMatrix = new Matrix();
     private final Paint plate = new Paint(Paint.ANTI_ALIAS_FLAG), stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path power = new Path();
@@ -89,6 +98,22 @@ public class WidgetView extends View {
     void setCols(JSONArray c) {
         cols = c;
         invalidate();
+    }
+
+    /** Карточка «Продолжить»: обложка, название и исполнитель последнего трека. pressed — уже нажали, ждём музыку. */
+    void setResume(String title, String artist, Bitmap bmp, boolean pressed) {
+        boolean changed = !"resume".equals(kind) || !title.equals(trackTitle) || !artist.equals(trackArtist)
+                || bmp != art || pressed != this.pressed;
+        kind = "resume";
+        wol = WOL_NONE;
+        trackTitle = title;
+        trackArtist = artist;
+        this.pressed = pressed;
+        if (bmp != art) {
+            art = bmp;
+            artPaint.setShader(bmp == null ? null : new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+        }
+        if (changed) invalidate();
     }
 
     void setWol(int state, String name) {
@@ -155,6 +180,10 @@ public class WidgetView extends View {
         float left = padX, right = w - padX, top = padTop, bottom = h - padBottom;
         if ("wol".equals(kind)) {
             drawWol(c, left, right, top, bottom);
+            return;
+        }
+        if ("resume".equals(kind)) {
+            drawResume(c, left, right, top, bottom);
             return;
         }
         Paint.Align al = alignRight ? Paint.Align.RIGHT : Paint.Align.LEFT;
@@ -295,18 +324,73 @@ public class WidgetView extends View {
         c.drawRect(rect, icon);
     }
 
-    /** Текст жирным снизу, не больше maxLines строк (лишнее — с многоточием). */
-    private void drawBody(Canvas c, String text, float left, float right, float bottom, int maxLines) {
-        int width = Math.max(1, (int) (right - left));
+    /** Текст не больше maxLines строк, лишнее — с многоточием. */
+    private StaticLayout lines(String text, TextPaint p, float width, int maxLines) {
+        int w = Math.max(1, (int) width);
         Layout.Alignment a = alignRight ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_NORMAL;
-        StaticLayout l = new StaticLayout(text, body, width, a, 1f, 0, false);
+        StaticLayout l = new StaticLayout(text, p, w, a, 1f, 0, false);
         if (l.getLineCount() > maxLines) {
             String cut = text.substring(0, l.getLineEnd(maxLines - 1)).trim();
             do {
                 cut = cut.substring(0, cut.length() - 1).trim();
-                l = new StaticLayout(cut + "…", body, width, a, 1f, 0, false);
+                l = new StaticLayout(cut + "…", p, w, a, 1f, 0, false);
             } while (cut.length() > 1 && l.getLineCount() > maxLines);
         }
+        return l;
+    }
+
+    /** Обложка квадратом во всю высоту, значок «играть» на ней; справа «Продолжить», название и исполнитель.
+     *  В правых углах всё зеркально: обложка справа, текст прижат вправо. */
+    private void drawResume(Canvas c, float left, float right, float top, float bottom) {
+        float s = bottom - top, r = dp(bare ? 10 : 14);
+        float ax = alignRight ? right - s : left;
+        rect.set(ax, top, ax + s, top + s);
+        if (art != null) {   // обложка по центру квадрата, лишнее обрезается
+            float k = Math.max(s / art.getWidth(), s / art.getHeight());
+            artMatrix.setScale(k, k);
+            artMatrix.postTranslate(ax + (s - art.getWidth() * k) / 2, top + (s - art.getHeight() * k) / 2);
+            artPaint.getShader().setLocalMatrix(artMatrix);
+            artPaint.setAlpha(night ? 90 : 255);
+            c.drawRoundRect(rect, r, r, artPaint);
+        } else {
+            c.drawRoundRect(rect, r, r, plate);
+        }
+        // кружок с треугольником «играть»
+        float cx = ax + s / 2, cy = top + s / 2, br = s * 0.2f;
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        p.setColor(night ? 0x99000000 : 0x73000000);
+        c.drawCircle(cx, cy, br, p);
+        p.setColor(night ? NIGHT : 0xffffffff);
+        Path tri = new Path();
+        tri.moveTo(cx - br * 0.32f, cy - br * 0.45f);
+        tri.lineTo(cx + br * 0.5f, cy);
+        tri.lineTo(cx - br * 0.32f, cy + br * 0.45f);
+        tri.close();
+        c.drawPath(tri, p);
+
+        float gap = dp(bare ? 14 : 16);
+        float tl = alignRight ? left : ax + s + gap, tr = alignRight ? ax - gap : right;
+        float x = alignRight ? tr : tl;
+        label.setTextAlign(alignRight ? Paint.Align.RIGHT : Paint.Align.LEFT);
+        c.drawText(fit(pressed ? "Включаю…" : "Продолжить", label, tr - tl), x, top - label.ascent(), label);
+        float artistBase = bottom - label.descent() * 0.4f;
+        if (trackArtist.length() > 0) c.drawText(fit(trackArtist, label, tr - tl), x, artistBase, label);
+        float bodySize = body.getTextSize();
+        body.setTextSize(sp(bare ? 17 : 18));
+        float free = (trackArtist.length() > 0 ? artistBase + label.ascent() : bottom) - (top + label.getFontSpacing()) - dp(2);
+        int maxLines = Math.max(1, Math.min(2, (int) (free / body.getFontSpacing())));
+        StaticLayout l = lines(trackTitle, body, tr - tl, maxLines);
+        float by = (trackArtist.length() > 0 ? artistBase + label.ascent() - dp(2) : bottom) - l.getHeight();
+        c.save();
+        c.translate(tl, by);
+        l.draw(c);
+        c.restore();
+        body.setTextSize(bodySize);
+    }
+
+    /** Текст жирным снизу, не больше maxLines строк (лишнее — с многоточием). */
+    private void drawBody(Canvas c, String text, float left, float right, float bottom, int maxLines) {
+        StaticLayout l = lines(text, body, right - left, maxLines);
         c.save();
         c.translate(left, bottom - l.getHeight() + body.descent() * 0.3f);
         l.draw(c);

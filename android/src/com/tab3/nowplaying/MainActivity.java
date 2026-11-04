@@ -169,6 +169,10 @@ public class MainActivity extends Activity {
     // Wake on LAN: адрес сетевой карты ПК запоминаем, пока он на связи, и будим его, когда пропал
     private String wolMac, wolName = "";
     private boolean wolOn;
+    private WidgetView resumeView;
+    private Bitmap coverBmp;              // последняя обложка — для карточки «Продолжить»
+    private boolean resumeOn = true;
+    private long resumeUntil;             // нажали «Продолжить» — до этого времени показываем «Включаю…»
     private int wolState = WidgetView.WOL_READY;
     private long wolUntil;
 
@@ -280,6 +284,15 @@ public class MainActivity extends Activity {
             }
             @Override public boolean onSingleTapUp(MotionEvent e) {
                 if (wakeFromDark()) return true;
+                if (idleBox.getVisibility() == View.VISIBLE && resumeView.getVisibility() == View.VISIBLE && inside(resumeView, e)) {
+                    long now = SystemClock.elapsedRealtime();
+                    if (now > resumeUntil && !playing) {
+                        control("toggle");
+                        resumeUntil = now + 5000;
+                        updateResume(now);
+                    }
+                    return true;
+                }
                 if (idleBox.getVisibility() == View.VISIBLE && wolView.getVisibility() == View.VISIBLE && inside(wolView, e)) {
                     if (wolState != WidgetView.WOL_WAKING) wakePc();
                     return true;
@@ -447,6 +460,9 @@ public class MainActivity extends Activity {
         wolView = new WidgetView(this, fontMedium, fontSemiBold, fontExtraBold);
         wolView.setVisibility(View.GONE);
         idleBox.addView(wolView, new FrameLayout.LayoutParams(dp(296), dp(140)));
+        resumeView = new WidgetView(this, fontMedium, fontSemiBold, fontExtraBold);
+        resumeView.setVisibility(View.GONE);
+        idleBox.addView(resumeView, new FrameLayout.LayoutParams(dp(296), dp(140)));
         root.addView(idleBox, new FrameLayout.LayoutParams(-1, -1));
         root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
             public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
@@ -966,6 +982,7 @@ public class MainActivity extends Activity {
         Drawable from = cover.getDrawable();
         // берём только последнюю картинку, иначе переходы вкладываются друг в друга и копят память
         if (from instanceof TransitionDrawable) from = ((TransitionDrawable) from).getDrawable(1);
+        coverBmp = bmp;
         Drawable to = bmp != null ? new BitmapDrawable(getResources(), bmp) : new ColorDrawable(0x33ffffff);
         vinyl.setLabel(bmp);
         if (from == null) from = new ColorDrawable(0);
@@ -1139,6 +1156,7 @@ public class MainActivity extends Activity {
         boolean modeChanged = !mode.equals(trackBgMode);
         trackBgMode = mode;
         trackDim = u.optInt("track_dim", 55);
+        resumeOn = u.optBoolean("resume", true);
         clipDim.setBackgroundColor(dimColor(trackDim));
         clockDim = u.optInt("clock_dim", 35);
         nightOn = u.optBoolean("night", true);
@@ -1273,6 +1291,7 @@ public class MainActivity extends Activity {
                     || (!playing && t - pausedSince > IDLE_AFTER_PAUSE_MS);
             if (idleNow != (idleBox.getVisibility() == View.VISIBLE)) showIdle(idleNow);
             updateWol(t);
+            updateResume(t);
             if (!idleNow || idleSince == 0) idleSince = t;
             updateScreen(idleNow, t);
             ui.postDelayed(this, 100);
@@ -1335,6 +1354,7 @@ public class MainActivity extends Activity {
         int W = root.getWidth(), H = root.getHeight();
         if (W == 0 || H == 0) return;
         boolean wolShown = wolVisible();
+        boolean resumeShown = !wolShown && resumeVisible();
         boolean any = false;
         weatherInWidget = false;
         int n = slotCount();
@@ -1347,8 +1367,8 @@ public class MainActivity extends Activity {
         }
         if (weatherInWidget) weatherText.setVisibility(View.GONE);
         boolean was = widgetMode;
-        widgetMode = any || wolShown;
-        String layout = any ? widgetLayout : "shelf";   // одна кнопка Wake on LAN — под часами
+        widgetMode = any || wolShown || resumeShown;
+        String layout = any ? widgetLayout : "shelf";   // одна кнопка (Wake on LAN, «Продолжить») — под часами
         boolean corners = "corners".equals(layout);
 
         // часы
@@ -1390,7 +1410,7 @@ public class MainActivity extends Activity {
 
         // места
         int m = dp(40), gap = dp(24), sw = (W - 2 * m - 2 * gap) / 3, sh = dp(140);
-        int ws = wolShown ? wolSlot(any) : -1;
+        int ws = wolShown || resumeShown ? wolSlot(any) : -1;
         for (int i = 0; i < slotViews.length; i++) {
             WidgetView v = slotViews[i];
             JSONObject o = i < n ? widgetSlots.optJSONObject(i) : null;
@@ -1411,10 +1431,19 @@ public class MainActivity extends Activity {
         } else {
             wolView.setVisibility(View.GONE);
         }
-        status.setVisibility(wolShown ? View.INVISIBLE : View.VISIBLE);
+        if (resumeShown) {
+            resumeView.setResume(title.getText().toString(), artist.getText().toString(), coverBmp,
+                    SystemClock.elapsedRealtime() < resumeUntil);
+            place(resumeView, layout, ws, W, H, m, gap, sw, sh);
+            resumeView.setVisibility(View.VISIBLE);
+        } else {
+            resumeView.setVisibility(View.GONE);
+        }
+        status.setVisibility(wolShown || resumeShown ? View.INVISIBLE : View.VISIBLE);
         boolean night = nightShown != null && nightShown;
         for (WidgetView w : slotViews) w.setNight(night);
         wolView.setNight(night);
+        resumeView.setNight(night);
     }
 
     private void place(WidgetView v, String layout, int i, int W, int H, int m, int gap, int sw, int sh) {
@@ -1460,6 +1489,18 @@ public class MainActivity extends Activity {
 
     private boolean wolVisible() {
         return wolOn && wolMac != null && pcLost;
+    }
+
+    /** «Продолжить» — когда ПК на связи, трек есть, но стоит на паузе. */
+    private boolean resumeVisible() {
+        return resumeOn && connected && !pcLost && trackId != null && !playing;
+    }
+
+    private void updateResume(long t) {
+        boolean want = !wolVisible() && resumeVisible();
+        boolean shown = resumeView.getVisibility() == View.VISIBLE;
+        if (want != shown) layoutWidgets();
+        else if (shown) resumeView.setResume(title.getText().toString(), artist.getText().toString(), coverBmp, t < resumeUntil);
     }
 
     /** Раз в 100 мс: показать или убрать кнопку, вовремя сменить «Включаю…» на «Не получилось». */

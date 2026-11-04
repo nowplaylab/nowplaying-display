@@ -39,13 +39,14 @@ DEFAULTS = {
     'countdown_title': '',
     'countdown_date': '',          # ГГГГ-ММ-ДД
     'note_text': '',
+    'resume': True,                # карточка «Продолжить» на часах, когда музыка на паузе
     'wol': True,                   # кнопка «Включить компьютер», когда ПК не отвечает
     # программа
     'auto_update': True,
 }
 
 # то, что нужно планшету
-UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min')
+UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume')
 
 
 class Settings:
