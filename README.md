@@ -43,7 +43,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-1.9.apk` for the tablet.
+- `NowPlaying-1.10.apk` for the tablet.
 
 ### 1. Server on the PC
 
@@ -70,7 +70,7 @@ Tray menu (right-click the icon):
 
 ### 2. App on the tablet
 
-Copy `NowPlaying-1.9.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
+Copy `NowPlaying-1.10.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
 
 Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on its own** and starts showing your music. If it doesn't, long-press the screen and enter the address shown in the tray menu on the PC.
 
@@ -81,7 +81,7 @@ Click the tray icon (or «Настройки…» in its menu) to open the setti
 - **Track screen:** the layout (Classic, Scene — cover in the middle with a line of lyrics under it, Poster — cover at full screen height, Minimal — no cover, large type, Vinyl — a spinning record sliding out of the cover sleeve); what's behind the cover — video from the music video, a gradient from the cover, a heavily blurred cover (also usable as the fallback when a track has no video), a single color, or your own photo/video for all songs; background dimming; a soft glow behind the cover that pulses with the music (the server listens to the PC's output level); cover shadow.
 - **Clock:** your own photo, GIF or video, its dimming, night mode hours, when to turn the screen off.
 - **Weather** under the date, from [Open-Meteo](https://open-meteo.com) (no account): turn it on and pick your city.
-- **Widgets** on the clock screen: weather now, a forecast (by hour or for 3 days), a second city's time, a countdown to a date, a short note. Pick a layout (a row under the clock, a column on the right, or the four corners), a style (card, outline or no background) and what goes in each place.
+- **Widgets** on the clock screen: weather now, a forecast (by hour or for 3 days), PC load (CPU, memory, GPU temperature), a second city's time, a countdown to a date, a short note. Pick a layout (a row under the clock, a column on the right, or the four corners), a style (card, outline or no background) and what goes in each place.
 - **Wake on LAN:** when the PC is off, the clock shows a «Включить компьютер» (turn on the computer) button. It works when the PC is connected to the router by cable and waking from the network is allowed in the BIOS and in the network card's power settings.
 - **Tablet:** is it online, and installing the app over adb by USB or Wi-Fi. If adb isn't installed, the window offers to download Google's official platform-tools (about 7 MB).
 - **Program:** automatic updates.

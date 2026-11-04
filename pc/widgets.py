@@ -13,7 +13,7 @@ log = logging.getLogger('nowplaying')
 
 LAYOUTS = ('shelf', 'column', 'corners')
 STYLES = ('card', 'line', 'none')
-KINDS = ('', 'weather', 'forecast', 'city', 'countdown', 'note')
+KINDS = ('', 'weather', 'forecast', 'pc', 'city', 'countdown', 'note')
 FORECAST_MODES = ('hours', 'days')
 WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
 SLOTS = 4          # в «Углах» четыре места, в остальных раскладках три
@@ -105,6 +105,18 @@ def forecast_widget(fc, mode, now=None):
     return {'kind': 'forecast', 'label': label, 'cols': cols} if len(cols) == 3 else None
 
 
+def pc_widget(st):
+    """Три колонки: процессор, память и температура видеокарты (или сколько ПК уже работает)."""
+    if not st:
+        return None
+    cols = [{'t': 'Процессор', 'v': f"{st['cpu']}%"}, {'t': 'Память', 'v': f"{st['mem']}%"}]
+    if st.get('gpu') is not None:
+        cols.append({'t': 'Видеокарта', 'v': f"{st['gpu']}°"})
+    else:
+        cols.append({'t': 'Работает', 'v': st['uptime']})
+    return {'kind': 'pc', 'label': 'Компьютер', 'cols': cols}
+
+
 def weather_widget(weather):
     if not weather:
         return None
@@ -144,7 +156,7 @@ def note_widget(s):
     return {'kind': 'note', 'label': 'Заметка', 'text': text} if text else None
 
 
-def build(s, weather, forecast=None):
+def build(s, weather, forecast=None, pc=None):
     """Для /api/now: раскладка, стиль и по виджету на каждое место (None — место пустое)."""
     out = []
     for kind in (s['widget_slots'] + [''] * SLOTS)[:SLOTS]:
@@ -154,6 +166,8 @@ def build(s, weather, forecast=None):
                 w = weather_widget(weather)
             elif kind == 'forecast':
                 w = forecast_widget(forecast, s['forecast_mode'])
+            elif kind == 'pc':
+                w = pc_widget(pc)
             elif kind == 'city':
                 w = city_widget(s)
             elif kind == 'countdown':

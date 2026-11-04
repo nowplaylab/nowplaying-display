@@ -166,7 +166,7 @@ public class WidgetView extends View {
             drawBody(c, bodyText, left, right, bottom, 2);
             return;
         }
-        if ("forecast".equals(kind)) {
+        if ("forecast".equals(kind) || "pc".equals(kind)) {
             drawForecast(c, left, right, bottom);
             return;
         }
@@ -193,33 +193,55 @@ public class WidgetView extends View {
         }
     }
 
-    /** Три колонки прогноза снизу: сверху значок и время (или день), под ними температура. */
+    /** Колонки снизу (прогноз, состояние ПК): сверху значок (если есть) и подпись, под ними значение. */
     private void drawForecast(Canvas c, float left, float right, float bottom) {
         if (cols == null || cols.length() == 0) return;
         int n = cols.length();
-        float colW = (right - left) / n;
         float is = dp(22);
         float tempBase = bottom - small.descent() * 0.4f;
         float rowBase = tempBase - small.getTextSize() * 1.05f;
         aside.setTextAlign(Paint.Align.LEFT);
         small.setTextAlign(Paint.Align.LEFT);
+        // ширина каждой колонки, потом равные промежутки: на подложке — по всей ширине,
+        // в «Углах» — плотной группой у своего края
+        float[] cw = new float[n], iw = new float[n];
+        float total = measureCols(cw, iw, is);
+        float asideSize = aside.getTextSize();
+        // подписи не влезают с нормальными промежутками — уменьшаем их, но не мельче 13sp
+        while (n > 1 && (right - left - total) / (n - 1) < dp(16) && aside.getTextSize() > sp(13.5f)) {
+            aside.setTextSize(aside.getTextSize() - sp(1));
+            total = measureCols(cw, iw, is);
+        }
+        float gap = n > 1 ? (right - left - total) / (n - 1) : 0;
+        if (bare) gap = Math.min(gap, dp(28));
+        float x = bare && alignRight ? right - total - gap * (n - 1) : left;
         for (int k = 0; k < n; k++) {
             JSONObject o = cols.optJSONObject(k);
             if (o == null) continue;
             String t = o.optString("t"), v = o.optString("v"), lo = o.optString("lo");
-            float w1 = is + dp(5) + aside.measureText(t);
-            float w2 = small.measureText(v) + (lo.length() > 0 ? dp(4) + aside.measureText(lo) : 0);
-            float cw = Math.max(w1, w2);
-            float x = left + colW * k;
-            if (alignRight) x += colW - cw;                       // правые углы: прижимаем к правому краю
-            else if (!bare && k == n - 1) x = right - cw;        // последняя колонка встаёт ровно по краю
-            else if (!bare && k > 0) x = left + (right - left - cw) * k / (n - 1f);
             float iy = rowBase + aside.ascent() * 0.5f - is / 2 + aside.descent() * 0.2f;
-            drawIcon(c, o.optString("i"), x, iy, is);
-            c.drawText(t, x + is + dp(5), rowBase, aside);
+            if (iw[k] > 0) drawIcon(c, o.optString("i"), x, iy, is);
+            c.drawText(t, x + iw[k], rowBase, aside);
             c.drawText(v, x, tempBase, small);
             if (lo.length() > 0) c.drawText(lo, x + small.measureText(v) + dp(4), tempBase, aside);
+            x += cw[k] + gap;
         }
+        aside.setTextSize(asideSize);
+    }
+
+    private float measureCols(float[] cw, float[] iw, float is) {
+        float total = 0;
+        for (int k = 0; k < cols.length(); k++) {
+            JSONObject o = cols.optJSONObject(k);
+            if (o == null) continue;
+            String lo = o.optString("lo");
+            iw[k] = o.optString("i").length() > 0 ? is + dp(5) : 0;
+            float w1 = iw[k] + aside.measureText(o.optString("t"));
+            float w2 = small.measureText(o.optString("v")) + (lo.length() > 0 ? dp(4) + aside.measureText(lo) : 0);
+            cw[k] = Math.max(w1, w2);
+            total += cw[k];
+        }
+        return total;
     }
 
     /** Простые значки погоды в квадрате s×s с левым верхним углом (x, y). */

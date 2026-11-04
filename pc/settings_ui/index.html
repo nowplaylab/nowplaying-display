@@ -325,7 +325,7 @@ a.btn { color: var(--text); text-decoration: none; }
 
     <section id="widgets">
       <h1>Виджеты</h1>
-      <p class="lead">Небольшие подписи на экране часов: погода, прогноз, второй город, отсчёт, заметка. Выбери раскладку и что стоит на каждом месте.</p>
+      <p class="lead">Небольшие подписи на экране часов: погода, прогноз, состояние компьютера, второй город, отсчёт, заметка. Выбери раскладку и что стоит на каждом месте.</p>
       <div class="card">
         <div class="row stack">
           <div class="t"><b>Раскладка</b></div>
@@ -354,6 +354,9 @@ a.btn { color: var(--text); text-decoration: none; }
           <div class="seg">
             <button data-fmode="hours">По часам</button><button data-fmode="days">На 3 дня</button>
           </div>
+        </div>
+        <div class="row" data-for="pc" hidden>
+          <div class="t"><b>Компьютер</b><small>Загрузка процессора, занятая память и температура видеокарты NVIDIA. Без неё — сколько комп уже работает</small></div>
         </div>
         <div class="row" data-for="city" hidden>
           <div class="t"><b>Второй город</b><small id="cityNow">Начни вводить название</small></div>
@@ -611,7 +614,7 @@ $('#cityInput').addEventListener('input', e => {
 document.addEventListener('click', e => { if (!e.target.closest('.city')) $('#cityResults').classList.remove('show'); });
 
 // виджеты
-const KINDS = [['', 'Пусто'], ['weather', 'Погода сейчас'], ['forecast', 'Прогноз'], ['city', 'Второй город'], ['countdown', 'Обратный отсчёт'], ['note', 'Заметка']];
+const KINDS = [['', 'Пусто'], ['weather', 'Погода сейчас'], ['forecast', 'Прогноз'], ['pc', 'Компьютер'], ['city', 'Второй город'], ['countdown', 'Обратный отсчёт'], ['note', 'Заметка']];
 const PLACES = { shelf: ['Слева', 'В центре', 'Справа'], column: ['Сверху', 'Посередине', 'Снизу'],
   corners: ['Слева сверху', 'Справа сверху', 'Слева снизу', 'Справа снизу'] };
 const slotCount = s => PLACES[s.widget_layout].length;

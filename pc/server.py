@@ -34,6 +34,7 @@ from winrt.windows.storage.streams import Buffer, InputStreamOptions
 
 import background
 import clips
+import pcstate
 import pulse
 import settings
 import settings_web
@@ -43,7 +44,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '1.9'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '1.10'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -376,7 +377,7 @@ async def h_now(request):
         s['track_media'] = {'id': rev, 'type': 'image', 'ext': 'jpg', 'url': f"/art/{s['track_id']}-blur.jpg?r={s['art_rev']}"}
     s['ui'] = SETTINGS.ui()
     s['weather'] = WEATHER.info() if SETTINGS['weather'] else None   # строка под датой
-    s['widgets'] = widgets.build(SETTINGS.get(), WEATHER.info(), WEATHER.forecast_info())
+    s['widgets'] = widgets.build(SETTINGS.get(), WEATHER.info(), WEATHER.forecast_info(), PC_STATE.info())
     s['wol'] = widgets.wol_info(request, SETTINGS['wol'])
     if request.remote not in ('127.0.0.1', '::1') and request.query.get('v'):
         LAST_CLIENT.update(ip=request.remote, at=time.time(), version=request.query['v'][:20])
@@ -503,6 +504,7 @@ TRACK_BG = background.Background(src_dir=os.path.join(background.default_dir(), 
 CLIPS = clips.Clips()
 UPDATER = updater.Updater(VERSION)
 WEATHER = weather.Weather(SETTINGS)
+PC_STATE = pcstate.PcState(SETTINGS)
 PULSE = pulse.Pulse()
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
@@ -587,6 +589,7 @@ async def on_startup(app):
     app['bg'] = asyncio.create_task(BG.watch())
     app['track_bg'] = asyncio.create_task(TRACK_BG.watch())
     app['weather'] = asyncio.create_task(WEATHER.watch(app['http']))
+    app['pcstate'] = asyncio.create_task(PC_STATE.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
     loop = asyncio.get_running_loop()
     app['udp'], _ = await loop.create_datagram_endpoint(Discovery, local_addr=('0.0.0.0', UDP_PORT))
