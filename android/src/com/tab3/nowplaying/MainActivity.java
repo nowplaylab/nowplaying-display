@@ -1305,7 +1305,7 @@ public class MainActivity extends Activity {
             String d = dateFmt.format(now);
             date.setText(d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1));
             if (now.getSeconds() == 0) moveClock(); // раз в минуту часы переезжают — чтобы экран не выгорал
-            if (now.getSeconds() == 0) for (WidgetView w : slotViews) w.invalidate();   // второй город
+            if (now.getSeconds() == 0) for (WidgetView w : slotViews) w.invalidate();   // второй город, календарь
             ui.postDelayed(this, 1000 - System.currentTimeMillis() % 1000);
         }
     };
@@ -1421,6 +1421,7 @@ public class MainActivity extends Activity {
             v.setData(o.optString("kind"), o.optString("label"), o.optString("value"), o.optString("aside"),
                     o.optString("text"), o.optInt("offset_min"));
             if (o.has("cols")) v.setCols(o.optJSONArray("cols"));
+            if (o.has("events")) v.setEvents(o.optJSONArray("events"));
             place(v, layout, i, W, H, m, gap, sw, sh);
             v.setVisibility(View.VISIBLE);
         }
@@ -1677,6 +1678,8 @@ public class MainActivity extends Activity {
 
     private void apply(JSONObject j) {
         connected = true;
+        long serverNow = j.optLong("server_time_ms", 0);
+        if (serverNow > 0) WidgetView.skewMs = serverNow - System.currentTimeMillis();
         JSONObject bg = j.optJSONObject("bg");
         String nbg = bg == null ? null : bg.optString("id", null);
         if (nbg == null ? bgId != null : !nbg.equals(bgId)) {

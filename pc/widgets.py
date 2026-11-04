@@ -13,7 +13,7 @@ log = logging.getLogger('nowplaying')
 
 LAYOUTS = ('shelf', 'column', 'corners')
 STYLES = ('card', 'line', 'none')
-KINDS = ('', 'weather', 'forecast', 'pc', 'city', 'countdown', 'note')
+KINDS = ('', 'weather', 'forecast', 'pc', 'calendar', 'city', 'countdown', 'note')
 FORECAST_MODES = ('hours', 'days')
 WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
 SLOTS = 4          # в «Углах» четыре места, в остальных раскладках три
@@ -117,6 +117,13 @@ def pc_widget(st):
     return {'kind': 'pc', 'label': 'Компьютер', 'cols': cols}
 
 
+def calendar_widget(events):
+    """Ближайшие события; какие из них уже прошли и как подписать день, планшет решает сам по своим часам."""
+    if events is None:
+        return None
+    return {'kind': 'calendar', 'label': 'Календарь', 'events': events}
+
+
 def weather_widget(weather):
     if not weather:
         return None
@@ -156,7 +163,7 @@ def note_widget(s):
     return {'kind': 'note', 'label': 'Заметка', 'text': text} if text else None
 
 
-def build(s, weather, forecast=None, pc=None):
+def build(s, weather, forecast=None, pc=None, calendar=None):
     """Для /api/now: раскладка, стиль и по виджету на каждое место (None — место пустое)."""
     out = []
     for kind in (s['widget_slots'] + [''] * SLOTS)[:SLOTS]:
@@ -168,6 +175,8 @@ def build(s, weather, forecast=None, pc=None):
                 w = forecast_widget(forecast, s['forecast_mode'])
             elif kind == 'pc':
                 w = pc_widget(pc)
+            elif kind == 'calendar':
+                w = calendar_widget(calendar)
             elif kind == 'city':
                 w = city_widget(s)
             elif kind == 'countdown':

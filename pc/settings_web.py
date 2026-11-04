@@ -65,6 +65,7 @@ def routes(srv):
             'track_media': media_info(srv.TRACK_BG),
             'preparing': {'clock': bool(srv.BG.pending), 'track': bool(srv.TRACK_BG.pending)},
             'weather_now': srv.WEATHER.info(),
+            'calendar': srv.CALENDAR.status(),
             'tablet': {'ip': tablet.get('ip'), 'seen': int(time.time() - tablet['at']) if tablet.get('at') else None,
                        'app_version': tablet.get('version')},
             'adb': bool(adbtool.adb_path()),

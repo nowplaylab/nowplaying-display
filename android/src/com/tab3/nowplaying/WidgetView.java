@@ -21,6 +21,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -28,6 +29,11 @@ import java.util.TimeZone;
 /** Один виджет на экране часов: подложка по стилю, подпись сверху, крупное значение или текст снизу.
  *  Тот же вид — кнопка «Включить компьютер» (Wake on LAN) со своими состояниями. */
 public class WidgetView extends View {
+    /** На сколько часы ПК впереди часов планшета, мс. На старом Android планшет может держать
+     *  неверное время UTC и неверный часовой пояс так, что местные часы на экране верны,
+     *  а всё, что считается от настоящего UTC (второй город, события календаря), уезжает. */
+    static volatile long skewMs;
+
     static final int WOL_NONE = 0, WOL_READY = 1, WOL_WAKING = 2, WOL_FAILED = 3;
     private static final int NIGHT = 0xffa3281e;
 
@@ -35,7 +41,10 @@ public class WidgetView extends View {
             aside = new TextPaint(Paint.ANTI_ALIAS_FLAG), body = new TextPaint(Paint.ANTI_ALIAS_FLAG),
             small = new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint icon = new Paint(Paint.ANTI_ALIAS_FLAG), iconLine = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private JSONArray cols;
+    private JSONArray cols, events;
+    private final SimpleDateFormat localHm = new SimpleDateFormat("HH:mm", Locale.US);
+    private final SimpleDateFormat ymd = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
+    private static final String[] WEEKDAYS = {"Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"};
     private Bitmap art;
     private String trackTitle = "", trackArtist = "";
     private boolean pressed;
@@ -90,6 +99,7 @@ public class WidgetView extends View {
         bodyText = text;
         this.offsetMin = offsetMin;
         cols = null;
+        events = null;
         wol = WOL_NONE;
         invalidate();
     }
@@ -114,6 +124,12 @@ public class WidgetView extends View {
             artPaint.setShader(bmp == null ? null : new BitmapShader(bmp, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
         }
         if (changed) invalidate();
+    }
+
+    /** События календаря: [{text, start, end, all_day, date, last}] — время в секундах UTC, даты ГГГГ-ММ-ДД. */
+    void setEvents(JSONArray e) {
+        events = e;
+        invalidate();
     }
 
     void setWol(int state, String name) {
@@ -195,6 +211,10 @@ public class WidgetView extends View {
             drawBody(c, bodyText, left, right, bottom, 2);
             return;
         }
+        if ("calendar".equals(kind)) {
+            drawCalendar(c, left, right, bottom);
+            return;
+        }
         if ("forecast".equals(kind) || "pc".equals(kind)) {
             drawForecast(c, left, right, bottom);
             return;
@@ -202,9 +222,11 @@ public class WidgetView extends View {
         String v = valueText, as = asideText;
         if ("city".equals(kind)) {
             // разницу считаем от часов самого планшета, чтобы она сходилась с тем, что на экране
-            long now = System.currentTimeMillis();
+            long own = System.currentTimeMillis(), now = own + skewMs;
             v = hm.format(new Date(now + offsetMin * 60000L));
-            as = hoursDiff(offsetMin - TimeZone.getDefault().getOffset(now) / 60000);
+            // каким смещением от настоящего UTC живут часы на экране — с точностью до 15 минут
+            int localMin = Math.round((TimeZone.getDefault().getOffset(own) - skewMs) / 900000f) * 15;
+            as = hoursDiff(offsetMin - localMin);
         }
         if (bare && "countdown".equals(kind) && as.length() > 0) v += " " + as;   // в углах подпись справа не помещается
         value.setTextAlign(al);
@@ -271,6 +293,74 @@ public class WidgetView extends View {
             total += cw[k];
         }
         return total;
+    }
+
+    /** Две ближайшие записи снизу: время или день слева, название справа от него. */
+    private void drawCalendar(Canvas c, float left, float right, float bottom) {
+        if (events == null) return;
+        long own = System.currentTimeMillis(), now = own + skewMs;   // now — настоящее время ПК
+        String today = ymd.format(new Date(own));
+        Calendar cal = Calendar.getInstance();
+        String[] when = new String[2], what = new String[2];
+        int n = 0;
+        for (int k = 0; k < events.length() && n < 2; k++) {
+            JSONObject e = events.optJSONObject(k);
+            if (e == null) continue;
+            if (e.optBoolean("all_day")) {
+                String d = e.optString("date"), last = e.optString("last", d);
+                if (last.compareTo(today) < 0) continue;
+                when[n] = d.compareTo(today) <= 0 ? "Сегодня" : dayName(d, today, cal);
+            } else {
+                long st = e.optLong("start") * 1000, en = e.optLong("end") * 1000;
+                if (Math.max(st, en) <= now) continue;
+                if (st <= now) {
+                    when[n] = "Сейчас";
+                } else {
+                    Date at = new Date(st - skewMs);   // в часах планшета — как на экране
+                    String d = ymd.format(at), hm = localHm.format(at);
+                    when[n] = d.equals(today) ? hm : dayName(d, today, cal) + " " + hm;
+                }
+            }
+            what[n] = e.optString("text");
+            n++;
+        }
+        if (n == 0) {
+            label.setTextAlign(alignRight ? Paint.Align.RIGHT : Paint.Align.LEFT);
+            c.drawText(fit("Две недели свободны", label, right - left), alignRight ? right : left,
+                    bottom - label.descent() * 0.4f, label);
+            return;
+        }
+        float bodySize = body.getTextSize();
+        body.setTextSize(sp(bare ? 18 : 19));
+        float lh = body.getFontSpacing() * 1.02f;
+        float base = bottom - body.descent() * 0.4f - lh * (n - 1);
+        float tw = 0;
+        for (int k = 0; k < n; k++) tw = Math.max(tw, aside.measureText(when[k]));
+        float gap = dp(12);
+        aside.setTextAlign(Paint.Align.LEFT);
+        body.setTextAlign(Paint.Align.LEFT);
+        for (int k = 0; k < n; k++) {
+            String t = fit(what[k], body, right - left - tw - gap);
+            float x = alignRight ? right - tw - gap - body.measureText(t) : left;
+            c.drawText(when[k], x, base, aside);
+            c.drawText(t, x + tw + gap, base, body);
+            base += lh;
+        }
+        body.setTextSize(bodySize);
+    }
+
+    /** «Завтра», день недели в ближайшую неделю, дальше — число и месяц («7.11»). */
+    private String dayName(String d, String today, Calendar cal) {
+        try {
+            Date date = ymd.parse(d), t = ymd.parse(today);
+            long days = Math.round((date.getTime() - t.getTime()) / 86400000.0);
+            if (days == 1) return "Завтра";
+            cal.setTime(date);
+            if (days < 7) return WEEKDAYS[cal.get(Calendar.DAY_OF_WEEK) - 1];
+            return cal.get(Calendar.DAY_OF_MONTH) + "." + (cal.get(Calendar.MONTH) + 1);
+        } catch (Exception e) {
+            return d;
+        }
     }
 
     /** Простые значки погоды в квадрате s×s с левым верхним углом (x, y). */

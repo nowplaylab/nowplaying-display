@@ -7,6 +7,7 @@ import json
 import os
 import threading
 
+import calendar_ics
 import widgets
 
 DEFAULTS = {
@@ -39,6 +40,7 @@ DEFAULTS = {
     'countdown_title': '',
     'countdown_date': '',          # ГГГГ-ММ-ДД
     'note_text': '',
+    'calendar_url': '',            # ссылка на календарь в формате iCal (у Google — «секретный адрес»)
     'resume': True,                # карточка «Продолжить» на часах, когда музыка на паузе
     'wol': True,                   # кнопка «Включить компьютер», когда ПК не отвечает
     # программа
@@ -94,7 +96,7 @@ class Settings:
                 except (TypeError, ValueError):
                     continue
             elif isinstance(d, str):
-                v = str(v)[:200]
+                v = str(v)[:1000 if k == 'calendar_url' else 200]
             clean[k] = v
         if 'widget_slots' in changes:
             v = changes['widget_slots']
@@ -113,6 +115,10 @@ class Settings:
             clean.pop('city_tz')
         if clean.get('countdown_date') and not widgets.DATE_RE.match(clean['countdown_date']):
             clean.pop('countdown_date')
+        if 'calendar_url' in clean:
+            clean['calendar_url'] = clean['calendar_url'].strip()
+            if not calendar_ics.valid_url(clean['calendar_url']):
+                clean.pop('calendar_url')
         if 'note_text' in clean:
             clean['note_text'] = clean['note_text'][:80]
         if clean.get('track_bg', 'video') not in ('video', 'gradient', 'blur', 'color', 'custom'):
