@@ -13,7 +13,9 @@ log = logging.getLogger('nowplaying')
 
 LAYOUTS = ('shelf', 'column', 'corners')
 STYLES = ('card', 'line', 'none')
-KINDS = ('', 'weather', 'city', 'countdown', 'note')
+KINDS = ('', 'weather', 'forecast', 'city', 'countdown', 'note')
+FORECAST_MODES = ('hours', 'days')
+WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс')
 SLOTS = 4          # в «Углах» четыре места, в остальных раскладках три
 DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
@@ -45,11 +47,68 @@ def split_two(text):
     return text[:i] + '\n' + text[i + 1:]
 
 
+def temp_text(t):
+    t = round(t)
+    return ('+' if t > 0 else '') + f'{t}°'.replace('-', '−')
+
+
+def icon_for(code):
+    """Код погоды WMO -> простой значок, который планшет рисует сам."""
+    if code in (0, 1):
+        return 'sun'
+    if code == 2:
+        return 'partly'
+    if code in (95, 96, 99):
+        return 'storm'
+    if code in (71, 73, 75, 77, 85, 86):
+        return 'snow'
+    if code in (51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82):
+        return 'rain'
+    if code in (45, 48):
+        return 'fog'
+    return 'cloud'
+
+
+def forecast_widget(fc, mode, now=None):
+    """Три колонки: через 3, 6, 9 часов (на круглые часы, кратные трём) или три следующих дня."""
+    if not fc:
+        return None
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    local = (now + datetime.timedelta(seconds=fc['offset'])).replace(tzinfo=None)
+    cols = []
+    if mode == 'days':
+        today = local.date()
+        for day, hi, lo, code in fc['daily']:
+            try:
+                d = datetime.date.fromisoformat(day)
+            except ValueError:
+                continue
+            if d <= today:
+                continue
+            cols.append({'t': WEEKDAYS[d.weekday()],
+                         'v': temp_text(hi), 'lo': temp_text(lo), 'i': icon_for(code)})
+            if len(cols) == 3:
+                break
+        label = 'На 3 дня'
+    else:
+        for t, temp, code in fc['hourly']:
+            try:
+                at = datetime.datetime.fromisoformat(t)
+            except ValueError:
+                continue
+            if at <= local + datetime.timedelta(minutes=30) or at.hour % 3:
+                continue
+            cols.append({'t': at.strftime('%H:%M'), 'v': temp_text(temp), 'i': icon_for(code)})
+            if len(cols) == 3:
+                break
+        label = 'По часам'
+    return {'kind': 'forecast', 'label': label, 'cols': cols} if len(cols) == 3 else None
+
+
 def weather_widget(weather):
     if not weather:
         return None
-    t = weather['temp']
-    return {'kind': 'weather', 'label': 'Сейчас', 'value': ('+' if t > 0 else '') + f'{t}°'.replace('-', '−'),
+    return {'kind': 'weather', 'label': 'Сейчас', 'value': temp_text(weather['temp']),
             'aside': split_two(weather.get('text') or '')}
 
 
@@ -85,7 +144,7 @@ def note_widget(s):
     return {'kind': 'note', 'label': 'Заметка', 'text': text} if text else None
 
 
-def build(s, weather):
+def build(s, weather, forecast=None):
     """Для /api/now: раскладка, стиль и по виджету на каждое место (None — место пустое)."""
     out = []
     for kind in (s['widget_slots'] + [''] * SLOTS)[:SLOTS]:
@@ -93,6 +152,8 @@ def build(s, weather):
         try:
             if kind == 'weather':
                 w = weather_widget(weather)
+            elif kind == 'forecast':
+                w = forecast_widget(forecast, s['forecast_mode'])
             elif kind == 'city':
                 w = city_widget(s)
             elif kind == 'countdown':

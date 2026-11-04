@@ -37,6 +37,7 @@ class Weather:
     def __init__(self, settings):
         self.settings = settings
         self.current = None     # {'temp': -3, 'text': 'снег'}
+        self.forecast = None    # {'offset': секунды от UTC, 'hourly': [(время, t, код)], 'daily': [(дата, max, min, код)]}
         self.place = None       # для каких координат current
         self.fetched_at = 0
         self.wake = asyncio.Event()
@@ -53,13 +54,19 @@ class Weather:
     def wanted(self):
         """Погода нужна под датой или в виджете «Погода сейчас»."""
         s = self.settings
-        return s['weather'] or 'weather' in s['widget_slots']
+        return s['weather'] or 'weather' in s['widget_slots'] or 'forecast' in s['widget_slots']
 
     def info(self):
         s = self.settings
         if not self.wanted() or self.place != (s['weather_lat'], s['weather_lon']):
             return None
         return self.current
+
+    def forecast_info(self):
+        s = self.settings
+        if 'forecast' not in s['widget_slots'] or self.place != (s['weather_lat'], s['weather_lon']):
+            return None
+        return self.forecast
 
     async def watch(self, http):
         self.loop = asyncio.get_running_loop()
@@ -79,11 +86,25 @@ class Weather:
 
     async def fetch(self, http, lat, lon):
         params = {'latitude': str(lat), 'longitude': str(lon), 'current': 'temperature_2m,weather_code',
+                  'hourly': 'temperature_2m,weather_code', 'forecast_hours': '30',
+                  'daily': 'temperature_2m_max,temperature_2m_min,weather_code', 'forecast_days': '5',
                   'timezone': 'auto'}
         async with http.get(FORECAST, params=params) as r:
             if r.status != 200:
                 return
-            cur = (await r.json(content_type=None)).get('current') or {}
+            data = await r.json(content_type=None)
+        cur = data.get('current') or {}
+        h, d = data.get('hourly') or {}, data.get('daily') or {}
+        try:
+            self.forecast = {
+                'offset': int(data.get('utc_offset_seconds') or 0),
+                'hourly': [x for x in zip(h['time'], h['temperature_2m'], h['weather_code']) if x[1] is not None],
+                'daily': [x for x in zip(d['time'], d['temperature_2m_max'], d['temperature_2m_min'],
+                                         d['weather_code']) if x[1] is not None],
+            }
+        except (KeyError, TypeError) as e:
+            log.warning('forecast: %s', e)
+            self.forecast = None
         t = cur.get('temperature_2m')
         if t is None:
             return

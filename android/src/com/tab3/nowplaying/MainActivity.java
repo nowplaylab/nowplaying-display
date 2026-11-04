@@ -1400,6 +1400,7 @@ public class MainActivity extends Activity {
             }
             v.setData(o.optString("kind"), o.optString("label"), o.optString("value"), o.optString("aside"),
                     o.optString("text"), o.optInt("offset_min"));
+            if ("forecast".equals(o.optString("kind"))) v.setCols(o.optJSONArray("cols"));
             place(v, layout, i, W, H, m, gap, sw, sh);
             v.setVisibility(View.VISIBLE);
         }

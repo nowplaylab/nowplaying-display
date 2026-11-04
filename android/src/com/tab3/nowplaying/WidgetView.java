@@ -13,6 +13,9 @@ import android.text.TextPaint;
 import android.util.TypedValue;
 import android.view.View;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -25,7 +28,10 @@ public class WidgetView extends View {
     private static final int NIGHT = 0xffa3281e;
 
     private final TextPaint label = new TextPaint(Paint.ANTI_ALIAS_FLAG), value = new TextPaint(Paint.ANTI_ALIAS_FLAG),
-            aside = new TextPaint(Paint.ANTI_ALIAS_FLAG), body = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+            aside = new TextPaint(Paint.ANTI_ALIAS_FLAG), body = new TextPaint(Paint.ANTI_ALIAS_FLAG),
+            small = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint icon = new Paint(Paint.ANTI_ALIAS_FLAG), iconLine = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private JSONArray cols;
     private final Paint plate = new Paint(Paint.ANTI_ALIAS_FLAG), stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect = new RectF();
     private final Path power = new Path();
@@ -47,6 +53,11 @@ public class WidgetView extends View {
         aside.setTextSize(sp(16));
         body.setTypeface(bold);
         body.setTextSize(sp(24));
+        small.setTypeface(semiBold);
+        small.setTextSize(sp(30));
+        iconLine.setStyle(Paint.Style.STROKE);
+        iconLine.setStrokeCap(Paint.Cap.ROUND);
+        iconLine.setStrokeWidth(dp(1.8f));
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeWidth(dp(1.5f));
         hm.setTimeZone(TimeZone.getTimeZone("UTC"));
@@ -69,7 +80,14 @@ public class WidgetView extends View {
         asideText = aside;
         bodyText = text;
         this.offsetMin = offsetMin;
+        cols = null;
         wol = WOL_NONE;
+        invalidate();
+    }
+
+    /** Колонки прогноза: [{t: «15:00» или «Пт», v: «+3°», lo: «−1°» (только по дням), i: значок}]. */
+    void setCols(JSONArray c) {
+        cols = c;
         invalidate();
     }
 
@@ -106,7 +124,10 @@ public class WidgetView extends View {
         body.setColor(main);
         label.setColor(night ? 0xbfa3281e : 0xabffffff);   // 75% ночью, 67% днём
         aside.setColor(night ? 0x8ca3281e : 0x80ffffff);
-        for (Paint p : new Paint[]{label, value, aside, body}) {
+        small.setColor(main);
+        icon.setColor(main);
+        iconLine.setColor(main);
+        for (Paint p : new Paint[]{label, value, aside, body, small, icon, iconLine}) {
             if (night) p.setShadowLayer(0, 0, 0, 0);
             else p.setShadowLayer(dp(3), 0, dp(1), 0x66000000);
         }
@@ -145,6 +166,10 @@ public class WidgetView extends View {
             drawBody(c, bodyText, left, right, bottom, 2);
             return;
         }
+        if ("forecast".equals(kind)) {
+            drawForecast(c, left, right, bottom);
+            return;
+        }
         String v = valueText, as = asideText;
         if ("city".equals(kind)) {
             // разницу считаем от часов самого планшета, чтобы она сходилась с тем, что на экране
@@ -166,6 +191,86 @@ public class WidgetView extends View {
                 y += lh;
             }
         }
+    }
+
+    /** Три колонки прогноза снизу: сверху значок и время (или день), под ними температура. */
+    private void drawForecast(Canvas c, float left, float right, float bottom) {
+        if (cols == null || cols.length() == 0) return;
+        int n = cols.length();
+        float colW = (right - left) / n;
+        float is = dp(22);
+        float tempBase = bottom - small.descent() * 0.4f;
+        float rowBase = tempBase - small.getTextSize() * 1.05f;
+        aside.setTextAlign(Paint.Align.LEFT);
+        small.setTextAlign(Paint.Align.LEFT);
+        for (int k = 0; k < n; k++) {
+            JSONObject o = cols.optJSONObject(k);
+            if (o == null) continue;
+            String t = o.optString("t"), v = o.optString("v"), lo = o.optString("lo");
+            float w1 = is + dp(5) + aside.measureText(t);
+            float w2 = small.measureText(v) + (lo.length() > 0 ? dp(4) + aside.measureText(lo) : 0);
+            float cw = Math.max(w1, w2);
+            float x = left + colW * k;
+            if (alignRight) x += colW - cw;                       // правые углы: прижимаем к правому краю
+            else if (!bare && k == n - 1) x = right - cw;        // последняя колонка встаёт ровно по краю
+            else if (!bare && k > 0) x = left + (right - left - cw) * k / (n - 1f);
+            float iy = rowBase + aside.ascent() * 0.5f - is / 2 + aside.descent() * 0.2f;
+            drawIcon(c, o.optString("i"), x, iy, is);
+            c.drawText(t, x + is + dp(5), rowBase, aside);
+            c.drawText(v, x, tempBase, small);
+            if (lo.length() > 0) c.drawText(lo, x + small.measureText(v) + dp(4), tempBase, aside);
+        }
+    }
+
+    /** Простые значки погоды в квадрате s×s с левым верхним углом (x, y). */
+    private void drawIcon(Canvas c, String kind, float x, float y, float s) {
+        c.save();
+        c.translate(x, y);
+        boolean drops = "rain".equals(kind) || "snow".equals(kind) || "storm".equals(kind);
+        if ("sun".equals(kind)) {
+            drawSun(c, s * 0.5f, s * 0.5f, s);
+        } else if ("fog".equals(kind)) {
+            for (int i = 0; i < 3; i++) {
+                float yy = s * (0.3f + 0.2f * i);
+                c.drawLine(s * (0.1f + 0.08f * (i % 2)), yy, s * (0.9f - 0.08f * ((i + 1) % 2)), yy, iconLine);
+            }
+        } else {
+            if ("partly".equals(kind)) drawSun(c, s * 0.68f, s * 0.32f, s * 0.62f);
+            drawCloud(c, s, drops ? -s * 0.14f : 0);
+            if ("rain".equals(kind)) {
+                for (int i = 0; i < 3; i++) {
+                    float xx = s * (0.3f + 0.2f * i);
+                    c.drawLine(xx, s * 0.74f, xx - s * 0.08f, s * 0.95f, iconLine);
+                }
+            } else if ("snow".equals(kind)) {
+                for (int i = 0; i < 3; i++) c.drawCircle(s * (0.3f + 0.2f * i), s * (0.82f + 0.08f * (i % 2)), s * 0.06f, icon);
+            } else if ("storm".equals(kind)) {
+                Path b = new Path();
+                b.moveTo(s * 0.55f, s * 0.68f);
+                b.lineTo(s * 0.42f, s * 0.84f);
+                b.lineTo(s * 0.56f, s * 0.84f);
+                b.lineTo(s * 0.44f, s * 1.0f);
+                c.drawPath(b, iconLine);
+            }
+        }
+        c.restore();
+    }
+
+    private void drawSun(Canvas c, float cx, float cy, float s) {
+        c.drawCircle(cx, cy, s * 0.2f, icon);
+        for (int i = 0; i < 8; i++) {
+            double a = Math.PI / 4 * i;
+            float cs = (float) Math.cos(a), sn = (float) Math.sin(a);
+            c.drawLine(cx + cs * s * 0.32f, cy + sn * s * 0.32f, cx + cs * s * 0.45f, cy + sn * s * 0.45f, iconLine);
+        }
+    }
+
+    private void drawCloud(Canvas c, float s, float dy) {
+        c.drawCircle(s * 0.32f, s * 0.6f + dy, s * 0.17f, icon);
+        c.drawCircle(s * 0.55f, s * 0.48f + dy, s * 0.24f, icon);
+        c.drawCircle(s * 0.75f, s * 0.62f + dy, s * 0.15f, icon);
+        rect.set(s * 0.32f, s * 0.6f + dy, s * 0.75f, s * 0.77f + dy);
+        c.drawRect(rect, icon);
     }
 
     /** Текст жирным снизу, не больше maxLines строк (лишнее — с многоточием). */

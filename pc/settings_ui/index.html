@@ -325,7 +325,7 @@ a.btn { color: var(--text); text-decoration: none; }
 
     <section id="widgets">
       <h1>Виджеты</h1>
-      <p class="lead">Небольшие подписи на экране часов: погода, второй город, отсчёт, заметка. Выбери раскладку и что стоит на каждом месте.</p>
+      <p class="lead">Небольшие подписи на экране часов: погода, прогноз, второй город, отсчёт, заметка. Выбери раскладку и что стоит на каждом месте.</p>
       <div class="card">
         <div class="row stack">
           <div class="t"><b>Раскладка</b></div>
@@ -348,6 +348,12 @@ a.btn { color: var(--text); text-decoration: none; }
         <div class="row" data-for="weather" hidden>
           <div class="t"><b>Погода сейчас</b><small>Город берётся из раздела «Погода»</small></div>
           <a class="btn" href="#weather">К погоде</a>
+        </div>
+        <div class="row" data-for="forecast" hidden>
+          <div class="t"><b>Прогноз</b><small>Три колонки: через 3, 6 и 9 часов или на три дня вперёд. Город из раздела «Погода»</small></div>
+          <div class="seg">
+            <button data-fmode="hours">По часам</button><button data-fmode="days">На 3 дня</button>
+          </div>
         </div>
         <div class="row" data-for="city" hidden>
           <div class="t"><b>Второй город</b><small id="cityNow">Начни вводить название</small></div>
@@ -518,6 +524,7 @@ function render(st) {
   $('#styleSub').textContent = s.widget_layout === 'corners' ? 'В «Углах» подписи всегда без подложки'
     : 'Подложка под каждым виджетом, тонкий контур или только линия сверху';
   renderSlots(s);
+  for (const b of $$('[data-fmode]')) b.classList.toggle('on', b.dataset.fmode === s.forecast_mode);
   const used = s.widget_slots.slice(0, slotCount(s));
   for (const r of $$('[data-for]')) r.hidden = !used.includes(r.dataset.for);
   if (document.activeElement !== $('#city2Input')) $('#city2Input').value = s.city_name;
@@ -604,7 +611,7 @@ $('#cityInput').addEventListener('input', e => {
 document.addEventListener('click', e => { if (!e.target.closest('.city')) $('#cityResults').classList.remove('show'); });
 
 // виджеты
-const KINDS = [['', 'Пусто'], ['weather', 'Погода сейчас'], ['city', 'Второй город'], ['countdown', 'Обратный отсчёт'], ['note', 'Заметка']];
+const KINDS = [['', 'Пусто'], ['weather', 'Погода сейчас'], ['forecast', 'Прогноз'], ['city', 'Второй город'], ['countdown', 'Обратный отсчёт'], ['note', 'Заметка']];
 const PLACES = { shelf: ['Слева', 'В центре', 'Справа'], column: ['Сверху', 'Посередине', 'Снизу'],
   corners: ['Слева сверху', 'Справа сверху', 'Слева снизу', 'Справа снизу'] };
 const slotCount = s => PLACES[s.widget_layout].length;
@@ -631,6 +638,7 @@ function renderSlots(s) {
 }
 for (const b of $$('.lay')) b.addEventListener('click', () => save({ widget_layout: b.dataset.layout }));
 for (const b of $$('[data-wstyle]')) b.addEventListener('click', () => save({ widget_style: b.dataset.wstyle }));
+for (const b of $$('[data-fmode]')) b.addEventListener('click', () => save({ forecast_mode: b.dataset.fmode }));
 $('#cdTitle').addEventListener('change', e => save({ countdown_title: e.target.value.trim() }));
 $('#cdDate').addEventListener('change', e => save({ countdown_date: e.target.value }));
 $('#noteText').addEventListener('change', e => save({ note_text: e.target.value.trim() }));

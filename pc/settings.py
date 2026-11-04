@@ -35,6 +35,7 @@ DEFAULTS = {
     'widget_slots': ['', '', '', ''],   # что на каждом месте: weather, city, countdown, note или пусто
     'city_name': '',               # второй город
     'city_tz': '',
+    'forecast_mode': 'hours',      # прогноз: hours — по часам, days — на 3 дня
     'countdown_title': '',
     'countdown_date': '',          # ГГГГ-ММ-ДД
     'note_text': '',
@@ -103,6 +104,8 @@ class Settings:
                 clean.pop('widget_slots', None)
         if clean.get('widget_layout', 'shelf') not in widgets.LAYOUTS:
             clean.pop('widget_layout')
+        if clean.get('forecast_mode', 'hours') not in widgets.FORECAST_MODES:
+            clean.pop('forecast_mode')
         if clean.get('widget_style', 'card') not in widgets.STYLES:
             clean.pop('widget_style')
         if clean.get('city_tz') and not widgets.valid_tz(clean['city_tz']):
