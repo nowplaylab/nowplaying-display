@@ -157,6 +157,20 @@ public class MainActivity extends Activity {
     private volatile float pulseLevel;
     private float glowShown;
     private boolean connected;
+    private volatile boolean pcLost;   // ПК перестал отвечать (а не просто ещё не ответил после запуска)
+
+    // виджеты на экране часов (раскладку и данные присылает ПК в /api/now → widgets)
+    private FrameLayout idleBox;           // часы + виджеты; сдвигается целиком, чтобы экран не выгорал
+    private final WidgetView[] slotViews = new WidgetView[4];
+    private WidgetView wolView;
+    private String widgetsJson = "", widgetLayout = "shelf", widgetStyle = "card";
+    private JSONArray widgetSlots = new JSONArray();
+    private boolean widgetMode, weatherInWidget;
+    // Wake on LAN: адрес сетевой карты ПК запоминаем, пока он на связи, и будим его, когда пропал
+    private String wolMac, wolName = "";
+    private boolean wolOn;
+    private int wolState = WidgetView.WOL_READY;
+    private long wolUntil;
 
     private final Random random = new Random();
     private final SimpleDateFormat clockFmt = new SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -266,6 +280,10 @@ public class MainActivity extends Activity {
             }
             @Override public boolean onSingleTapUp(MotionEvent e) {
                 if (wakeFromDark()) return true;
+                if (idleBox.getVisibility() == View.VISIBLE && wolView.getVisibility() == View.VISIBLE && inside(wolView, e)) {
+                    if (wolState != WidgetView.WOL_WAKING) wakePc();
+                    return true;
+                }
                 if (player.getVisibility() == View.VISIBLE && lyrics.isBrowsing() && inside(lyrics, e)) {
                     // текст пролистан — тап по строке перематывает на неё
                     long t = lyrics.timeAt(e.getRawY() - screenY(lyrics));
@@ -419,7 +437,25 @@ public class MainActivity extends Activity {
         wlp.gravity = Gravity.CENTER_HORIZONTAL;
         wlp.topMargin = dp(4);
         idle.addView(weatherText, wlp);
-        root.addView(idle, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        idleBox = new FrameLayout(this);
+        idleBox.addView(idle, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        for (int i = 0; i < slotViews.length; i++) {
+            slotViews[i] = new WidgetView(this, fontMedium, fontSemiBold, fontExtraBold);
+            slotViews[i].setVisibility(View.GONE);
+            idleBox.addView(slotViews[i], new FrameLayout.LayoutParams(dp(296), dp(140)));
+        }
+        wolView = new WidgetView(this, fontMedium, fontSemiBold, fontExtraBold);
+        wolView.setVisibility(View.GONE);
+        idleBox.addView(wolView, new FrameLayout.LayoutParams(dp(296), dp(140)));
+        root.addView(idleBox, new FrameLayout.LayoutParams(-1, -1));
+        root.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                if (r - l != or - ol || b - t != ob - ot) ui.post(new Runnable() { public void run() { layoutWidgets(); } });
+            }
+        });
+        wolMac = prefs.getString("wol_mac", null);
+        wolName = prefs.getString("wol_name", "");
+        wolOn = prefs.getBoolean("wol_on", true);
 
         status = text(14, false, 150);
         FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
@@ -442,7 +478,7 @@ public class MainActivity extends Activity {
 
     private void showIdle(boolean on) {
         playerShown = !on;
-        idle.setVisibility(on ? View.VISIBLE : View.GONE);
+        idleBox.setVisibility(on ? View.VISIBLE : View.GONE);
         player.setVisibility(on ? View.GONE : View.VISIBLE);
         bgLayer.setVisibility(on && bgReady ? View.VISIBLE : View.GONE);
         bgVideo.setVisibility(on && bgReady && "video".equals(bgType) ? View.VISIBLE : View.GONE);
@@ -674,7 +710,7 @@ public class MainActivity extends Activity {
             bgReady = bmp != null;
         } else {
             bgImage.setImageDrawable(null);
-            bgVideo.setVisibility(idle.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
+            bgVideo.setVisibility(idleBox.getVisibility() == View.VISIBLE ? View.VISIBLE : View.GONE);
             bgVideo.setOnPreparedListener(new android.media.MediaPlayer.OnPreparedListener() {
                 public void onPrepared(android.media.MediaPlayer mp) {
                     mp.setLooping(true);
@@ -692,7 +728,7 @@ public class MainActivity extends Activity {
             bgVideo.setVideoPath(file.getPath());
             bgReady = true;
         }
-        bgLayer.setVisibility(idle.getVisibility() == View.VISIBLE && bgReady ? View.VISIBLE : View.GONE);
+        bgLayer.setVisibility(idleBox.getVisibility() == View.VISIBLE && bgReady ? View.VISIBLE : View.GONE);
     }
 
     private static int darker(int c) {
@@ -989,6 +1025,8 @@ public class MainActivity extends Activity {
             date.setTextColor(night ? 0x99a3281e : Color.argb(190, 255, 255, 255));
             weatherText.setTextColor(night ? 0x80a3281e : Color.argb(170, 255, 255, 255));
             bgDim.setBackgroundColor(night ? 0xd9000000 : dimColor(clockDim));
+            for (WidgetView w : slotViews) w.setNight(night);
+            wolView.setNight(night);
         }
         syncBgVideo(idleNow && !darkNow);
         syncClip(!idleNow && !darkNow);
@@ -1122,7 +1160,7 @@ public class MainActivity extends Activity {
     }
 
     private void showWeather(JSONObject w) {
-        if (w == null) {
+        if (w == null || weatherInWidget) {
             weatherText.setVisibility(View.GONE);
             return;
         }
@@ -1233,7 +1271,8 @@ public class MainActivity extends Activity {
             long t = SystemClock.elapsedRealtime();
             boolean idleNow = !connected || trackId == null
                     || (!playing && t - pausedSince > IDLE_AFTER_PAUSE_MS);
-            if (idleNow != (idle.getVisibility() == View.VISIBLE)) showIdle(idleNow);
+            if (idleNow != (idleBox.getVisibility() == View.VISIBLE)) showIdle(idleNow);
+            updateWol(t);
             if (!idleNow || idleSince == 0) idleSince = t;
             updateScreen(idleNow, t);
             ui.postDelayed(this, 100);
@@ -1247,13 +1286,21 @@ public class MainActivity extends Activity {
             String d = dateFmt.format(now);
             date.setText(d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1));
             if (now.getSeconds() == 0) moveClock(); // раз в минуту часы переезжают — чтобы экран не выгорал
+            if (now.getSeconds() == 0) for (WidgetView w : slotViews) w.invalidate();   // второй город
             ui.postDelayed(this, 1000 - System.currentTimeMillis() % 1000);
         }
     };
 
     /** Плавно переносим часы в случайное место экрана (с отступом от краёв). */
     private void moveClock() {
-        if (idle.getVisibility() != View.VISIBLE || idle.getWidth() == 0) return;
+        if (idleBox.getVisibility() != View.VISIBLE || idle.getWidth() == 0) return;
+        if (widgetMode) {
+            // с виджетами раскладка стоит на месте, а всё вместе чуть-чуть гуляет
+            int d = dp(12);
+            idleBox.animate().translationX(random.nextInt(2 * d + 1) - d).translationY(random.nextInt(2 * d + 1) - d)
+                    .setDuration(4000).setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).start();
+            return;
+        }
         int margin = dp(24);
         int maxX = Math.max(0, (root.getWidth() - idle.getWidth()) / 2 - margin);
         int maxY = Math.max(0, (root.getHeight() - idle.getHeight()) / 2 - margin);
@@ -1261,6 +1308,216 @@ public class MainActivity extends Activity {
         float y = maxY == 0 ? 0 : random.nextInt(2 * maxY + 1) - maxY;
         idle.animate().translationX(x).translationY(y).setDuration(4000)
                 .setInterpolator(new android.view.animation.AccelerateDecelerateInterpolator()).start();
+    }
+
+    // ---------------- виджеты ----------------
+
+    private void applyWidgets(JSONObject w) {
+        if (w == null || w.toString().equals(widgetsJson)) return;
+        widgetsJson = w.toString();
+        widgetLayout = w.optString("layout", "shelf");
+        widgetStyle = w.optString("style", "card");
+        widgetSlots = w.optJSONArray("slots");
+        if (widgetSlots == null) widgetSlots = new JSONArray();
+        layoutWidgets();
+    }
+
+    private int slotCount() { return "corners".equals(widgetLayout) ? 4 : 3; }
+
+    /** Куда ставить «Включить компьютер»: на последнее место раскладки, а без виджетов — в центр полки. */
+    private int wolSlot(boolean anyWidget) {
+        if (!anyWidget) return 1;
+        return slotCount() - 1;
+    }
+
+    /** Расставить часы и виджеты по раскладке. Без виджетов часы стоят по центру и гуляют по экрану, как раньше. */
+    private void layoutWidgets() {
+        int W = root.getWidth(), H = root.getHeight();
+        if (W == 0 || H == 0) return;
+        boolean wolShown = wolVisible();
+        boolean any = false;
+        weatherInWidget = false;
+        int n = slotCount();
+        for (int i = 0; i < n; i++) {
+            JSONObject o = widgetSlots.optJSONObject(i);
+            if (o != null) {
+                any = true;
+                if ("weather".equals(o.optString("kind"))) weatherInWidget = true;
+            }
+        }
+        if (weatherInWidget) weatherText.setVisibility(View.GONE);
+        boolean was = widgetMode;
+        widgetMode = any || wolShown;
+        String layout = any ? widgetLayout : "shelf";   // одна кнопка Wake on LAN — под часами
+        boolean corners = "corners".equals(layout);
+
+        // часы
+        FrameLayout.LayoutParams ilp = (FrameLayout.LayoutParams) idle.getLayoutParams();
+        ilp.leftMargin = ilp.topMargin = 0;
+        float clockSp = 130;
+        int textGravity = Gravity.CENTER_HORIZONTAL;
+        if (!widgetMode) {
+            ilp.gravity = Gravity.CENTER;
+        } else if ("column".equals(layout)) {
+            ilp.gravity = Gravity.LEFT | Gravity.CENTER_VERTICAL;
+            ilp.leftMargin = dp(56);
+            clockSp = 150;
+            textGravity = Gravity.LEFT;
+        } else if (corners) {
+            ilp.gravity = Gravity.CENTER;
+            clockSp = 150;
+        } else {
+            ilp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            ilp.topMargin = Math.max(dp(30), (H - dp(40) - dp(140) - dp(250)) / 2);
+        }
+        idle.setLayoutParams(ilp);
+        idle.setGravity(textGravity == Gravity.LEFT ? Gravity.LEFT : Gravity.CENTER);
+        clock.setGravity(textGravity);
+        date.setGravity(textGravity);
+        weatherText.setGravity(textGravity);
+        for (View v : new View[]{date, weatherText}) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) v.getLayoutParams();
+            lp.gravity = textGravity;
+            v.setLayoutParams(lp);
+        }
+        clock.setTextSize(TypedValue.COMPLEX_UNIT_SP, clockSp);
+        if (widgetMode != was) {   // сменился режим — с чистого места
+            idle.animate().cancel();
+            idleBox.animate().cancel();
+            idle.setTranslationX(0); idle.setTranslationY(0);
+            idleBox.setTranslationX(0); idleBox.setTranslationY(0);
+        }
+
+        // места
+        int m = dp(40), gap = dp(24), sw = (W - 2 * m - 2 * gap) / 3, sh = dp(140);
+        int ws = wolShown ? wolSlot(any) : -1;
+        for (int i = 0; i < slotViews.length; i++) {
+            WidgetView v = slotViews[i];
+            JSONObject o = i < n ? widgetSlots.optJSONObject(i) : null;
+            if (o == null || i == ws) {
+                v.setVisibility(View.GONE);
+                continue;
+            }
+            v.setData(o.optString("kind"), o.optString("label"), o.optString("value"), o.optString("aside"),
+                    o.optString("text"), o.optInt("offset_min"));
+            place(v, layout, i, W, H, m, gap, sw, sh);
+            v.setVisibility(View.VISIBLE);
+        }
+        if (wolShown) {
+            wolView.setWol(wolState, wolName);
+            place(wolView, layout, ws, W, H, m, gap, sw, sh);
+            wolView.setVisibility(View.VISIBLE);
+        } else {
+            wolView.setVisibility(View.GONE);
+        }
+        status.setVisibility(wolShown ? View.INVISIBLE : View.VISIBLE);
+        boolean night = nightShown != null && nightShown;
+        for (WidgetView w : slotViews) w.setNight(night);
+        wolView.setNight(night);
+    }
+
+    private void place(WidgetView v, String layout, int i, int W, int H, int m, int gap, int sw, int sh) {
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) v.getLayoutParams();
+        lp.gravity = Gravity.LEFT | Gravity.TOP;
+        if ("column".equals(layout)) {
+            int w = Math.min(dp(296), sw);
+            lp.width = w; lp.height = sh;
+            lp.leftMargin = W - m - w;
+            lp.topMargin = (H - 3 * sh - 2 * gap) / 2 + i * (sh + gap);
+            v.setLook(widgetStyle, false, false);
+        } else if ("corners".equals(layout)) {
+            int w = Math.min(dp(296), sw), h = dp(96), top = dp(34);
+            boolean rightSide = i % 2 == 1;
+            lp.width = w; lp.height = h;
+            lp.leftMargin = rightSide ? W - m - w : m;
+            lp.topMargin = i < 2 ? top : H - top - h;
+            v.setLook(widgetStyle, true, rightSide);
+        } else {
+            lp.width = sw; lp.height = sh;
+            lp.leftMargin = m + i * (sw + gap);
+            lp.topMargin = H - m - sh;
+            v.setLook(widgetStyle, false, false);
+        }
+        v.setLayoutParams(lp);
+    }
+
+    // ---------------- Wake on LAN ----------------
+
+    private void applyWol(JSONObject w) {
+        if (w == null) return;   // старый сервер — помним то, что было
+        boolean on = w.optBoolean("on", false);
+        String mac = w.isNull("mac") ? null : w.optString("mac", null);
+        String name = w.optString("name", "");
+        if (mac == null && on) return;
+        if (on != wolOn || (mac != null && !mac.equals(wolMac)) || !name.equals(wolName)) {
+            wolOn = on;
+            if (mac != null) wolMac = mac;
+            wolName = name;
+            prefs.edit().putBoolean("wol_on", wolOn).putString("wol_mac", wolMac).putString("wol_name", wolName).commit();
+        }
+    }
+
+    private boolean wolVisible() {
+        return wolOn && wolMac != null && pcLost;
+    }
+
+    /** Раз в 100 мс: показать или убрать кнопку, вовремя сменить «Включаю…» на «Не получилось». */
+    private void updateWol(long t) {
+        if (wolState == WidgetView.WOL_WAKING && t > wolUntil) {
+            wolState = WidgetView.WOL_FAILED;
+            wolUntil = t + 6000;
+        } else if (wolState == WidgetView.WOL_FAILED && t > wolUntil) {
+            wolState = WidgetView.WOL_READY;
+        }
+        boolean shown = wolView.getVisibility() == View.VISIBLE;
+        if (wolVisible() != shown) layoutWidgets();
+        else if (shown) wolView.setWol(wolState, wolName);
+    }
+
+    private void wakePc() {
+        final String mac = wolMac;
+        if (mac == null) return;
+        wolState = WidgetView.WOL_WAKING;
+        wolUntil = SystemClock.elapsedRealtime() + 60000;
+        wolView.setWol(wolState, wolName);
+        pool.execute(new Runnable() {
+            public void run() {
+                try { sendMagicPacket(mac); } catch (Exception e) { android.util.Log.w("NowPlaying", "wol: " + e); }
+            }
+        });
+    }
+
+    /** «Волшебный пакет»: 6 байт 0xFF и 16 раз MAC — широковещательно на порты 9 и 7, три раза. */
+    private void sendMagicPacket(String mac) throws Exception {
+        String[] hex = mac.split("[:-]");
+        byte[] m = new byte[6];
+        for (int i = 0; i < 6; i++) m[i] = (byte) Integer.parseInt(hex[i], 16);
+        byte[] pkt = new byte[6 + 16 * 6];
+        for (int i = 0; i < 6; i++) pkt[i] = (byte) 0xff;
+        for (int i = 0; i < 16; i++) System.arraycopy(m, 0, pkt, 6 + i * 6, 6);
+        List<InetAddress> targets = new ArrayList<InetAddress>();
+        targets.add(InetAddress.getByName("255.255.255.255"));
+        WifiManager wm = (WifiManager) getSystemService(WIFI_SERVICE);
+        DhcpInfo dhcp = wm != null ? wm.getDhcpInfo() : null;
+        if (dhcp != null && dhcp.ipAddress != 0) {
+            int bc = (dhcp.ipAddress & dhcp.netmask) | ~dhcp.netmask;
+            byte[] q = new byte[4];
+            for (int k = 0; k < 4; k++) q[k] = (byte) ((bc >> (k * 8)) & 0xff);
+            targets.add(InetAddress.getByAddress(q));
+        }
+        DatagramSocket sock = new DatagramSocket();
+        try {
+            sock.setBroadcast(true);
+            for (int round = 0; round < 3; round++) {
+                for (InetAddress a : targets) {
+                    sock.send(new DatagramPacket(pkt, pkt.length, a, 9));
+                    sock.send(new DatagramPacket(pkt, pkt.length, a, 7));
+                }
+                Thread.sleep(300);
+            }
+        } finally {
+            sock.close();
+        }
     }
 
     private void askServer() {
@@ -1307,6 +1564,7 @@ public class MainActivity extends Activity {
                 setStatus("Нет связи с компьютером " + s);
                 if (failures >= 5) {
                     connected = false;
+                    pcLost = true;
                     if (failures % 5 == 0) {          // попробуем найти ПК заново (мог смениться IP)
                         String found = discover();
                         if (found != null) server = found;
@@ -1386,6 +1644,12 @@ public class MainActivity extends Activity {
         }
         if (!volumeDrag && !j.isNull("volume")) volume = j.optInt("volume", -1);
         applyUi(j.optJSONObject("ui"));
+        if (pcLost) {   // ПК снова ответил — в том числе после «Включить компьютер»
+            pcLost = false;
+            wolState = WidgetView.WOL_READY;
+        }
+        applyWol(j.optJSONObject("wol"));
+        applyWidgets(j.optJSONObject("widgets"));
         showWeather(j.optJSONObject("weather"));
         // за треком: своё фото/видео или видео клипа из Яндекс Музыки
         String nclip = null, path = null, type = "video";

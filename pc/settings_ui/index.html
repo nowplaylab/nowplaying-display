@@ -85,6 +85,7 @@ select option { background: #222; }
 .btn { background: var(--card-hi); border: 1px solid var(--line); border-radius: 9px; padding: 7px 14px; cursor: pointer;
   white-space: nowrap; transition: background .15s, border-color .15s; }
 .btn:hover { background: #2c2c30; }
+a.btn { color: var(--text); text-decoration: none; }
 .btn.primary { background: var(--accent); border-color: transparent; color: #0e1030; }
 .btn.primary:hover { background: #a0aeff; }
 .btn:disabled { opacity: .45; cursor: default; }
@@ -172,13 +173,34 @@ select option { background: #222; }
   color: var(--dim); font-size: 13px; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none; }
 .toast.show { opacity: 1; transform: none; }
 
+
+/* виджеты */
+.layouts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.lay { background: var(--card-hi); border: 1.5px solid transparent; border-radius: 12px; padding: 8px 8px 10px; cursor: pointer;
+  text-align: left; transition: border-color .15s, background .15s; }
+.lay:hover { background: #29292d; }
+.lay.on { border-color: var(--accent); }
+.lay b { display: block; font-weight: 500; margin: 8px 2px 0; font-size: 13px; }
+.lay small { display: block; color: var(--dim); font-size: 11.5px; margin: 1px 2px 0; line-height: 1.3; }
+.lay .thumb { background: linear-gradient(135deg, #2d1f45, #1d1830 55%, #141022); }
+.lay .clk { position: absolute; height: 15%; border-radius: 2px; background: rgba(255,255,255,.9); }
+.lay .wd { position: absolute; height: 23%; width: 29%; border-radius: 4px; background: rgba(255,255,255,.18); }
+.lay .wd.bare { background: none; border-top: 2px solid rgba(255,255,255,.4); border-radius: 0; }
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.slot { display: flex; flex-direction: column; gap: 6px; }
+.slot span { color: var(--dim); font-size: 12px; }
+.slot select { width: 100%; }
+.wfield { width: 300px; flex: none; }
+.wfield.short { width: 160px; }
+
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; }
   aside { display: none; }
   main { padding: 24px 16px 50px; }
   .modes, .themes { grid-template-columns: repeat(2, 1fr); }
   .row { flex-wrap: wrap; }
-  .range, .city { width: 100%; }
+  .range, .city, .wfield { width: 100%; }
+  .layouts { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -192,6 +214,7 @@ select option { background: #222; }
     <nav>
       <a href="#track" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="8" height="8" rx="1.5"/><path d="M14 7h7M14 11h5M3 17h18"/></svg>Экран трека</a>
       <a href="#clock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Часы</a>
+      <a href="#widgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3.5" width="18" height="9" rx="2"/><rect x="3" y="15" width="8" height="5.5" rx="1.5"/><rect x="13" y="15" width="8" height="5.5" rx="1.5"/></svg>Виджеты</a>
       <a href="#weather"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.3 3.4 3.4 0 0 0 7 18Z"/></svg>Погода</a>
       <a href="#tablet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M19 12h.01"/></svg>Планшет</a>
       <a href="#app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Программа</a>
@@ -296,6 +319,58 @@ select option { background: #222; }
             <option value="0">никогда</option><option value="10">через 10 минут</option><option value="30">через 30 минут</option>
             <option value="60">через час</option><option value="120">через 2 часа</option>
           </select>
+        </div>
+      </div>
+    </section>
+
+    <section id="widgets">
+      <h1>Виджеты</h1>
+      <p class="lead">Небольшие подписи на экране часов: погода, второй город, отсчёт, заметка. Выбери раскладку и что стоит на каждом месте.</p>
+      <div class="card">
+        <div class="row stack">
+          <div class="t"><b>Раскладка</b></div>
+          <div class="layouts">
+            <button class="lay" data-layout="shelf"><div class="thumb"><i class="clk" style="left:34%;top:18%;width:32%"></i><i class="wd" style="left:4%;top:70%"></i><i class="wd" style="left:35.5%;top:70%"></i><i class="wd" style="left:67%;top:70%"></i></div><b>Полка</b><small>Ряд из трёх мест под часами</small></button>
+            <button class="lay" data-layout="column"><div class="thumb"><i class="clk" style="left:6%;top:40%;width:40%"></i><i class="wd" style="left:67%;top:11%"></i><i class="wd" style="left:67%;top:38.5%"></i><i class="wd" style="left:67%;top:66%"></i></div><b>Колонка</b><small>Часы слева, три места справа</small></button>
+            <button class="lay" data-layout="corners"><div class="thumb"><i class="clk" style="left:30%;top:40%;width:40%"></i><i class="wd bare" style="left:4%;top:6%"></i><i class="wd bare" style="left:67%;top:6%"></i><i class="wd bare" style="left:4%;top:71%"></i><i class="wd bare" style="left:67%;top:71%"></i></div><b>Углы</b><small>Четыре тихих подписи по углам</small></button>
+          </div>
+        </div>
+        <div class="row" id="styleRow">
+          <div class="t"><b>Стиль</b><small id="styleSub">Подложка под каждым виджетом, тонкий контур или только линия сверху</small></div>
+          <div class="seg">
+            <button data-wstyle="card">Подложка</button><button data-wstyle="line">Контур</button><button data-wstyle="none">Без подложки</button>
+          </div>
+        </div>
+        <div class="row stack">
+          <div class="t"><b>Что где стоит</b><small>Пустое место не видно. Если пусто везде, часы стоят по центру, как раньше</small></div>
+          <div class="slots" id="slots"></div>
+        </div>
+        <div class="row" data-for="weather" hidden>
+          <div class="t"><b>Погода сейчас</b><small>Город берётся из раздела «Погода»</small></div>
+          <a class="btn" href="#weather">К погоде</a>
+        </div>
+        <div class="row" data-for="city" hidden>
+          <div class="t"><b>Второй город</b><small id="cityNow">Начни вводить название</small></div>
+          <div class="city" id="city2">
+            <input class="field" id="city2Input" placeholder="Например, Москва" autocomplete="off">
+            <div class="results" id="city2Results"></div>
+          </div>
+        </div>
+        <div class="row" data-for="countdown" hidden>
+          <div class="t"><b>Обратный отсчёт</b><small>Что ждёшь и когда. После этой даты место опустеет</small></div>
+          <input class="field wfield short" id="cdTitle" placeholder="До Нового года" maxlength="40">
+          <input class="field" type="date" id="cdDate">
+        </div>
+        <div class="row" data-for="note" hidden>
+          <div class="t"><b>Заметка</b><small>Короткий текст, до 80 знаков</small></div>
+          <input class="field wfield" id="noteText" placeholder="Купить корм коту" maxlength="80">
+        </div>
+        <div class="row">
+          <div class="t"><b>Включать компьютер с планшета</b><small id="wolSub">Когда комп выключен, на часах появится кнопка «Включить компьютер»</small></div>
+          <label class="sw"><input type="checkbox" data-key="wol"><i></i></label>
+        </div>
+        <div class="row sub">
+          <div class="note">Работает, если комп подключён к роутеру кабелем и пробуждение по сети разрешено: в BIOS (пункт Wake on LAN или Power On by PCI-E) и у сетевой карты в «Диспетчере устройств» → свойства → «Управление электропитанием».</div>
         </div>
       </div>
     </section>
@@ -436,6 +511,22 @@ function render(st) {
   if (st.weather_now) {
     wn.append(el('span', 'wnow', (st.weather_now.temp > 0 ? '+' : '') + st.weather_now.temp + '°'), '\u00a0 ' + st.weather_now.text);
   } else wn.textContent = s.weather_city ? (s.weather ? 'Загружаю…' : s.weather_city) : 'Выбери город';
+  // виджеты
+  for (const b of $$('.lay')) b.classList.toggle('on', b.dataset.layout === s.widget_layout);
+  for (const b of $$('[data-wstyle]')) b.classList.toggle('on', b.dataset.wstyle === s.widget_style);
+  $('#styleRow').style.opacity = s.widget_layout === 'corners' ? .45 : 1;
+  $('#styleSub').textContent = s.widget_layout === 'corners' ? 'В «Углах» подписи всегда без подложки'
+    : 'Подложка под каждым виджетом, тонкий контур или только линия сверху';
+  renderSlots(s);
+  const used = s.widget_slots.slice(0, slotCount(s));
+  for (const r of $$('[data-for]')) r.hidden = !used.includes(r.dataset.for);
+  if (document.activeElement !== $('#city2Input')) $('#city2Input').value = s.city_name;
+  $('#cityNow').textContent = s.city_name ? 'Часовой пояс: ' + s.city_tz : 'Начни вводить название';
+  if (document.activeElement !== $('#cdTitle')) $('#cdTitle').value = s.countdown_title;
+  if (document.activeElement !== $('#cdDate')) $('#cdDate').value = s.countdown_date;
+  if (document.activeElement !== $('#noteText')) $('#noteText').value = s.note_text;
+  $('#wolSub').textContent = st.wol.mac ? `Будит ${st.wol.name} (сетевая карта ${st.wol.mac}), когда он не отвечает`
+    : 'Когда комп выключен, на часах появится кнопка «Включить компьютер»';
   // планшет
   const t = st.tablet, online = t.seen !== null && t.seen < 15;
   $('#tabdot').classList.toggle('ok', online);
@@ -511,6 +602,63 @@ $('#cityInput').addEventListener('input', e => {
   }, 300);
 });
 document.addEventListener('click', e => { if (!e.target.closest('.city')) $('#cityResults').classList.remove('show'); });
+
+// виджеты
+const KINDS = [['', 'Пусто'], ['weather', 'Погода сейчас'], ['city', 'Второй город'], ['countdown', 'Обратный отсчёт'], ['note', 'Заметка']];
+const PLACES = { shelf: ['Слева', 'В центре', 'Справа'], column: ['Сверху', 'Посередине', 'Снизу'],
+  corners: ['Слева сверху', 'Справа сверху', 'Слева снизу', 'Справа снизу'] };
+const slotCount = s => PLACES[s.widget_layout].length;
+function renderSlots(s) {
+  const box = $('#slots');
+  if (box.dataset.layout !== s.widget_layout) {
+    box.dataset.layout = s.widget_layout;
+    box.textContent = '';
+    PLACES[s.widget_layout].forEach((name, i) => {
+      const wrap = el('label', 'slot');
+      wrap.append(el('span', null, name));
+      const sel = document.createElement('select');
+      for (const [v, t] of KINDS) sel.add(new Option(t, v));
+      sel.addEventListener('change', () => {
+        const slots = S.settings.widget_slots.slice();
+        slots[i] = sel.value;
+        save({ widget_slots: slots });
+      });
+      wrap.append(sel);
+      box.append(wrap);
+    });
+  }
+  [...box.querySelectorAll('select')].forEach((sel, i) => { if (document.activeElement !== sel) sel.value = s.widget_slots[i] || ''; });
+}
+for (const b of $$('.lay')) b.addEventListener('click', () => save({ widget_layout: b.dataset.layout }));
+for (const b of $$('[data-wstyle]')) b.addEventListener('click', () => save({ widget_style: b.dataset.wstyle }));
+$('#cdTitle').addEventListener('change', e => save({ countdown_title: e.target.value.trim() }));
+$('#cdDate').addEventListener('change', e => save({ countdown_date: e.target.value }));
+$('#noteText').addEventListener('change', e => save({ note_text: e.target.value.trim() }));
+let city2Timer;
+$('#city2Input').addEventListener('input', e => {
+  clearTimeout(city2Timer);
+  const q = e.target.value.trim();
+  city2Timer = setTimeout(async () => {
+    const box = $('#city2Results');
+    if (q.length < 2) { box.classList.remove('show'); return; }
+    const list = (await api('/api/settings/geocode?q=' + encodeURIComponent(q))).filter(c => c.tz);
+    box.textContent = '';
+    if (!list.length) { const n = el('div', 'note', 'Ничего не нашлось'); n.style.padding = '8px'; box.append(n); }
+    for (const c of list) {
+      const b = el('button');
+      b.append(c.name + ' ', el('small', null, [c.region, c.country].filter(Boolean).join(', ')));
+      b.addEventListener('click', () => {
+        box.classList.remove('show');
+        $('#city2Input').value = c.name;
+        save({ city_name: c.name, city_tz: c.tz });
+        $('#city2Input').blur();
+      });
+      box.append(b);
+    }
+    box.classList.add('show');
+  }, 300);
+});
+document.addEventListener('click', e => { if (!e.target.closest('#city2')) $('#city2Results').classList.remove('show'); });
 
 // adb
 async function adbFind() {

@@ -5,6 +5,7 @@
 """
 import asyncio
 import os
+import socket
 import sys
 import time
 
@@ -13,6 +14,7 @@ from aiohttp import web
 import adbtool
 import background
 import weather
+import widgets
 
 MEDIA_EXT = background.IMAGE_EXT | background.VIDEO_EXT
 
@@ -66,6 +68,7 @@ def routes(srv):
             'tablet': {'ip': tablet.get('ip'), 'seen': int(time.time() - tablet['at']) if tablet.get('at') else None,
                        'app_version': tablet.get('version')},
             'adb': bool(adbtool.adb_path()),
+            'wol': {'mac': widgets.LAST.get('mac'), 'name': socket.gethostname()},
         }
 
     async def page(request):

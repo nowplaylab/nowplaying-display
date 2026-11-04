@@ -29,7 +29,7 @@ async def search_city(http, name):
     out = []
     for c in (data or {}).get('results') or []:
         out.append({'name': c.get('name'), 'region': c.get('admin1') or '', 'country': c.get('country') or '',
-                    'lat': c.get('latitude'), 'lon': c.get('longitude')})
+                    'lat': c.get('latitude'), 'lon': c.get('longitude'), 'tz': c.get('timezone') or ''})
     return out
 
 
@@ -50,9 +50,14 @@ class Weather:
             if loop:
                 loop.call_soon_threadsafe(self.wake.set)
 
+    def wanted(self):
+        """Погода нужна под датой или в виджете «Погода сейчас»."""
+        s = self.settings
+        return s['weather'] or 'weather' in s['widget_slots']
+
     def info(self):
         s = self.settings
-        if not s['weather'] or self.place != (s['weather_lat'], s['weather_lon']):
+        if not self.wanted() or self.place != (s['weather_lat'], s['weather_lon']):
             return None
         return self.current
 
@@ -61,7 +66,7 @@ class Weather:
         while True:
             s = self.settings
             place = (s['weather_lat'], s['weather_lon'])
-            if s['weather'] and None not in place and (place != self.place or time.time() - self.fetched_at > EVERY):
+            if self.wanted() and None not in place and (place != self.place or time.time() - self.fetched_at > EVERY):
                 try:
                     await self.fetch(http, *place)
                 except Exception as e:

@@ -38,11 +38,12 @@ import pulse
 import settings
 import settings_web
 import weather
+import widgets
 import updater
 import volume
 import yandex
 
-VERSION = '1.7.1'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '1.8'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -374,7 +375,9 @@ async def h_now(request):
         rev = f"{s['track_id']}r{s['art_rev']}"   # новая (чёткая) обложка — новый размытый фон
         s['track_media'] = {'id': rev, 'type': 'image', 'ext': 'jpg', 'url': f"/art/{s['track_id']}-blur.jpg?r={s['art_rev']}"}
     s['ui'] = SETTINGS.ui()
-    s['weather'] = WEATHER.info()
+    s['weather'] = WEATHER.info() if SETTINGS['weather'] else None   # строка под датой
+    s['widgets'] = widgets.build(SETTINGS.get(), WEATHER.info())
+    s['wol'] = widgets.wol_info(request, SETTINGS['wol'])
     if request.remote not in ('127.0.0.1', '::1') and request.query.get('v'):
         LAST_CLIENT.update(ip=request.remote, at=time.time(), version=request.query['v'][:20])
     s['apk_version'] = UPDATER.apk[0] if UPDATER.apk else None  # планшет сравнит со своей

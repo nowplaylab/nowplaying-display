@@ -7,6 +7,8 @@ import json
 import os
 import threading
 
+import widgets
+
 DEFAULTS = {
     # экран трека
     'theme': 'classic',       # раскладка экрана трека: classic, scene, poster, minimal, vinyl
@@ -27,6 +29,16 @@ DEFAULTS = {
     'weather_city': '',
     'weather_lat': None,
     'weather_lon': None,
+    # виджеты на экране часов
+    'widget_layout': 'shelf',      # shelf — ряд под часами, column — столбик справа, corners — по углам
+    'widget_style': 'card',        # card — подложка, line — контур, none — без подложки
+    'widget_slots': ['', '', '', ''],   # что на каждом месте: weather, city, countdown, note или пусто
+    'city_name': '',               # второй город
+    'city_tz': '',
+    'countdown_title': '',
+    'countdown_date': '',          # ГГГГ-ММ-ДД
+    'note_text': '',
+    'wol': True,                   # кнопка «Включить компьютер», когда ПК не отвечает
     # программа
     'auto_update': True,
 }
@@ -82,6 +94,23 @@ class Settings:
             elif isinstance(d, str):
                 v = str(v)[:200]
             clean[k] = v
+        if 'widget_slots' in changes:
+            v = changes['widget_slots']
+            if isinstance(v, list):
+                v = [str(x) if str(x) in widgets.KINDS else '' for x in v[:widgets.SLOTS]]
+                clean['widget_slots'] = v + [''] * (widgets.SLOTS - len(v))
+            else:
+                clean.pop('widget_slots', None)
+        if clean.get('widget_layout', 'shelf') not in widgets.LAYOUTS:
+            clean.pop('widget_layout')
+        if clean.get('widget_style', 'card') not in widgets.STYLES:
+            clean.pop('widget_style')
+        if clean.get('city_tz') and not widgets.valid_tz(clean['city_tz']):
+            clean.pop('city_tz')
+        if clean.get('countdown_date') and not widgets.DATE_RE.match(clean['countdown_date']):
+            clean.pop('countdown_date')
+        if 'note_text' in clean:
+            clean['note_text'] = clean['note_text'][:80]
         if clean.get('track_bg', 'video') not in ('video', 'gradient', 'blur', 'color', 'custom'):
             clean.pop('track_bg')
         if clean.get('video_fallback', 'gradient') not in ('gradient', 'blur'):
