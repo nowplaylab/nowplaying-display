@@ -6,6 +6,10 @@ SDK="${ANDROID_SDK:-${ANDROID_HOME:-}}"
 [ -n "$SDK" ] || { echo "Укажите путь к Android SDK: ANDROID_SDK=/c/android-sdk sh android/build.sh" >&2; exit 1; }
 BT="$SDK/build-tools/34.0.0"
 JAR="$SDK/platforms/android-17/android.jar"
+# ресурсы и манифест связываем с android-21: там есть android:banner для Android TV
+# (старые Android этот атрибут просто не замечают); код по-прежнему проверяется по API 17
+RJAR="$SDK/platforms/android-21/android.jar"
+[ -f "$RJAR" ] || RJAR="$JAR"
 SRC="$(cd "$(dirname "$0")" && pwd)"
 B="${BUILD_DIR:-${TMPDIR:-/tmp}/np-build}"
 KS="${KEYSTORE:-$SDK/nowplaying.keystore}"
@@ -16,8 +20,8 @@ if [ -d "$SRC/assets" ]; then cp -r "$SRC/assets" "$B/"; fi
 cd "$B"
 
 "$BT/aapt2.exe" compile --dir res -o res.zip
-"$BT/aapt2.exe" link -I "$JAR" --manifest AndroidManifest.xml --java gen \
-    --min-sdk-version 16 --target-sdk-version 17 -o base.apk res.zip
+"$BT/aapt2.exe" link -I "$RJAR" --manifest AndroidManifest.xml --java gen \
+    --min-sdk-version 16 --target-sdk-version 23 -o base.apk res.zip
 
 javac -encoding UTF-8 -source 8 -target 8 -nowarn -Xlint:-options -bootclasspath "$JAR" -d classes \
     $(find src gen -name '*.java')

@@ -28,6 +28,7 @@ import android.os.Handler;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.view.KeyEvent;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.Gravity;
@@ -183,6 +184,9 @@ public class MainActivity extends Activity {
     private int pomoRound = 1;
     private boolean ringing;
     private long ringStarted, panelUntil;
+    private int timerFg = 0xffffffff;
+    private boolean longOk;          // ОК на пульте держат — уже открыли ввод адреса
+    private long lastScan;           // когда последний раз перебирали адреса сети
     private LinearLayout timerPanel;
     private TextView timerPill, ringView;
     private MediaPlayer ringPlayer;
@@ -670,12 +674,15 @@ public class MainActivity extends Activity {
                         // root нет — покажем обычное окно установки
                     }
                     if (!silent) {
-                        final android.net.Uri uri = android.net.Uri.fromFile(file);
+                        // Android 7+ не пускает file:// в чужое приложение — отдаём через свой провайдер
+                        final boolean content = android.os.Build.VERSION.SDK_INT >= 24;
+                        final android.net.Uri uri = content ? ApkProvider.uri() : android.net.Uri.fromFile(file);
                         ui.post(new Runnable() {
                             public void run() {
                                 android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
                                 i.setDataAndType(uri, "application/vnd.android.package-archive");
                                 i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                if (content) i.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
                                 startActivity(i);
                             }
                         });
@@ -1228,6 +1235,14 @@ public class MainActivity extends Activity {
         bg.setCornerRadius(dp(30));
         c.setBackgroundDrawable(bg);
         c.setOnClickListener(click);
+        // пульт ТВ: кнопки выбираются стрелками, выбранная обведена
+        c.setFocusable(true);
+        c.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            public void onFocusChange(View v, boolean has) {
+                ((GradientDrawable) v.getBackground()).setStroke(has ? dp(3) : 0, timerFg);
+                panelUntil = SystemClock.elapsedRealtime() + 12000;
+            }
+        });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.leftMargin = lp.rightMargin = dp(5);
         c.setLayoutParams(lp);
@@ -1289,6 +1304,7 @@ public class MainActivity extends Activity {
 
     private void styleTimer(boolean night) {
         int fg = night ? 0xffa3281e : 0xffffffff;
+        timerFg = fg;
         GradientDrawable panel = new GradientDrawable();
         panel.setCornerRadius(dp(36));
         panel.setColor(night ? 0xf2000000 : 0xeb161618);
@@ -1516,6 +1532,91 @@ public class MainActivity extends Activity {
         sunriseColors = new int[]{top, mix(top, bottom, 0.6f), bottom};
         sunriseBg.setColors(sunriseColors);
         sunrise.setVisibility(View.VISIBLE);
+    }
+
+    /** Пульт ТВ (и клавиатура): ОК — пауза, влево/вправо — трек, вверх/вниз — громкость ПК,
+     *  меню — адрес ПК, ОК на часах — таймер. Касания работают как раньше. */
+    @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        int k = e.getKeyCode();
+        boolean center = k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER
+                || k == KeyEvent.KEYCODE_NUMPAD_ENTER;
+        boolean media = k == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || k == KeyEvent.KEYCODE_MEDIA_PLAY
+                || k == KeyEvent.KEYCODE_MEDIA_PAUSE || k == KeyEvent.KEYCODE_MEDIA_NEXT
+                || k == KeyEvent.KEYCODE_MEDIA_PREVIOUS || k == KeyEvent.KEYCODE_HEADSETHOOK;
+        boolean arrows = k == KeyEvent.KEYCODE_DPAD_LEFT || k == KeyEvent.KEYCODE_DPAD_RIGHT
+                || k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN;
+        boolean menu = k == KeyEvent.KEYCODE_MENU;
+        boolean back = k == KeyEvent.KEYCODE_BACK;
+        if (!(center || media || arrows || menu || back)) return super.dispatchKeyEvent(e);
+        if (back && !ringing && timerPanel.getVisibility() != View.VISIBLE) return super.dispatchKeyEvent(e);
+        // панель таймера открыта — стрелки и ОК ходят по её кнопкам, «назад» закрывает
+        if (timerPanel.getVisibility() == View.VISIBLE && !ringing && (center || arrows || back)) {
+            panelUntil = SystemClock.elapsedRealtime() + 12000;
+            if (back) {
+                if (e.getAction() == KeyEvent.ACTION_UP) hideTimerPanel();
+                return true;
+            }
+            if (timerPanel.findFocus() == null && e.getAction() == KeyEvent.ACTION_DOWN) {
+                focusFirstChip();
+                return true;
+            }
+            return super.dispatchKeyEvent(e);
+        }
+        // долгое ОК — ввести адрес ПК (на пультах ТВ часто нет кнопки «меню»)
+        if (center && e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() > 0
+                && e.getEventTime() - e.getDownTime() >= 700 && !longOk && !ringing) {
+            longOk = true;
+            askServer();
+            return true;
+        }
+        if (center && e.getAction() == KeyEvent.ACTION_UP && longOk) {
+            longOk = false;
+            return true;
+        }
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
+            // громкость можно держать — повторяется; остальное — один раз на нажатие
+            if ((k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN)
+                    && player.getVisibility() == View.VISIBLE && volume >= 0 && dark.getVisibility() != View.VISIBLE) {
+                setVolume(volume + (k == KeyEvent.KEYCODE_DPAD_UP ? 5 : -5), true);
+            }
+            return true;
+        }
+        if (e.getAction() != KeyEvent.ACTION_UP) return true;
+        if (ringing) {
+            stopRing();
+            return true;
+        }
+        if (wakeFromDark()) return true;
+        boolean onPlayer = player.getVisibility() == View.VISIBLE;
+        if (menu) {
+            askServer();
+        } else if (k == KeyEvent.KEYCODE_MEDIA_NEXT || (onPlayer && k == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+            control("next");
+            flash("⏭");
+        } else if (k == KeyEvent.KEYCODE_MEDIA_PREVIOUS || (onPlayer && k == KeyEvent.KEYCODE_DPAD_LEFT)) {
+            control("prev");
+            flash("⏮");
+        } else if (media || (onPlayer && center)) {
+            control("toggle");
+            if (onPlayer) flash(playing ? "❚❚" : "▶");
+        } else if (center && idleBox.getVisibility() == View.VISIBLE) {
+            if (resumeView.getVisibility() == View.VISIBLE) {
+                long now = SystemClock.elapsedRealtime();   // «Продолжить» — то же, что тап по карточке
+                if (now > resumeUntil && !playing) {
+                    control("toggle");
+                    resumeUntil = now + 5000;
+                    updateResume(now);
+                }
+            } else {
+                showTimerPanel();
+                focusFirstChip();
+            }
+        }
+        return true;
+    }
+
+    private void focusFirstChip() {
+        if (timerPanel.getChildCount() > 1) timerPanel.getChildAt(1).requestFocus();
     }
 
     /** Если экран «спит» — будим его на минуту и не считаем касание командой. */
@@ -2186,7 +2287,59 @@ public class MainActivity extends Activity {
         } finally {
             if (sock != null) sock.close();
         }
+        // широковещание не дошло (бывает, когда на ТВ включён VPN или роутер режет broadcast) —
+        // раз в 20 с спрашиваем по очереди все адреса своей сети
+        long t = SystemClock.elapsedRealtime();
+        if (t - lastScan < 20000) return null;
+        lastScan = t;
+        return scanSubnet();
+    }
+
+    /** Свой адрес в домашней сети (Wi-Fi или кабель), без VPN-туннелей. */
+    private static byte[] lanAddress() {
+        try {
+            for (java.net.NetworkInterface ni : java.util.Collections.list(java.net.NetworkInterface.getNetworkInterfaces())) {
+                String n = ni.getName();
+                if (!ni.isUp() || ni.isLoopback() || n.startsWith("tun") || n.startsWith("ppp") || n.startsWith("tap")) continue;
+                for (InetAddress a : java.util.Collections.list(ni.getInetAddresses())) {
+                    if (a instanceof java.net.Inet4Address && a.isSiteLocalAddress()) return a.getAddress();
+                }
+            }
+        } catch (Exception ignored) { }
         return null;
+    }
+
+    /** Перебор x.x.x.1–254 на порту 47801: кто ответит «ok» на /health, тот и наш ПК. */
+    private String scanSubnet() {
+        byte[] me = lanAddress();
+        if (me == null) return null;
+        final String base = (me[0] & 0xff) + "." + (me[1] & 0xff) + "." + (me[2] & 0xff) + ".";
+        final int self = me[3] & 0xff;
+        final java.util.concurrent.atomic.AtomicReference<String> found = new java.util.concurrent.atomic.AtomicReference<String>();
+        java.util.concurrent.ExecutorService ex = java.util.concurrent.Executors.newFixedThreadPool(32);
+        final java.util.concurrent.CountDownLatch done = new java.util.concurrent.CountDownLatch(254);
+        for (int i = 1; i <= 254; i++) {
+            final int h = i;
+            ex.execute(new Runnable() {
+                public void run() {
+                    try {
+                        if (h != self && found.get() == null) {
+                            String addr = base + h + ":47801";
+                            String r = new String(get("http://" + addr + "/health", 600), "UTF-8").trim();
+                            if (r.equals("ok")) found.compareAndSet(null, addr);
+                        }
+                    } catch (Exception ignored) {
+                    } finally {
+                        done.countDown();
+                    }
+                }
+            });
+        }
+        try {
+            while (found.get() == null && !done.await(200, java.util.concurrent.TimeUnit.MILLISECONDS)) { }
+        } catch (InterruptedException ignored) { }
+        ex.shutdownNow();
+        return found.get();
     }
 
     private void apply(JSONObject j) {

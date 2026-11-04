@@ -1,18 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tab3.nowplaying"
-    android:versionCode="17"
-    android:versionName="2.1">
+    android:versionCode="18"
+    android:versionName="2.2">
 
-    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="17" />
+    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Android TV: экрана касаний нет, но ставиться можно; на планшетах ничего не меняется -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
 
     <application
         android:label="Сейчас играет"
         android:icon="@drawable/icon"
+        android:banner="@drawable/banner"
         android:allowBackup="false"
         android:theme="@android:style/Theme.Holo.NoActionBar.Fullscreen">
         <activity
@@ -23,8 +27,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+        <provider android:name=".ApkProvider"
+            android:authorities="com.tab3.nowplaying.apk"
+            android:exported="false"
+            android:grantUriPermissions="true" />
         <receiver android:name=".BootReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

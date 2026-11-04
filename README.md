@@ -87,6 +87,7 @@ Click the tray icon (or «Настройки…» in its menu) to open the setti
 - **Resume:** when music is paused, the clock shows a card with the last track's cover and title. Tap it to keep playing.
 - **Visualizer:** frequency bands of whatever the PC plays bounce at the bottom of the track screen, in the cover's color. Three looks: bars, wave, dots.
 - **Several screens:** one PC can feed several tablets or phones. Each shows up in the settings window on its own, and can get its own track screen, clock, widgets, alarm and visualizer.
+- **Android TV:** the app shows up in the TV launcher with its own banner and works with the remote: OK pauses, left and right switch tracks, up and down change the PC volume, holding OK lets you type the PC address.
 - **Wake on LAN:** when the PC is off, the clock shows a «Включить компьютер» (turn on the computer) button. It works when the PC is connected to the router by cable and waking from the network is allowed in the BIOS and in the network card's power settings.
 - **Tablet:** is it online, and installing the app over adb by USB or Wi-Fi. If adb isn't installed, the window offers to download Google's official platform-tools (about 7 MB).
 - **Program:** automatic updates.
