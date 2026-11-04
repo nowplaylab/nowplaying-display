@@ -13,6 +13,7 @@ from aiohttp import web
 
 import adbtool
 import background
+import photoframe
 import weather
 import widgets
 
@@ -66,6 +67,7 @@ def routes(srv):
             'preparing': {'clock': bool(srv.BG.pending), 'track': bool(srv.TRACK_BG.pending)},
             'weather_now': srv.WEATHER.info(),
             'calendar': srv.CALENDAR.status(),
+            'frame': {'status': srv.FRAME.status(), 'name': (srv.FRAME.current or {}).get('source', '')},
             'tablet': {'ip': tablet.get('ip'), 'seen': int(time.time() - tablet['at']) if tablet.get('at') else None,
                        'app_version': tablet.get('version')},
             'adb': bool(adbtool.adb_path()),
@@ -143,6 +145,12 @@ def routes(srv):
         os.startfile((srv.BG if kind == 'clock' else srv.TRACK_BG).src_dir)
         return srv.jsonr({'ok': True})
 
+    async def frame_pick(request):
+        path = await asyncio.get_running_loop().run_in_executor(None, photoframe.pick_folder, srv.SETTINGS['frame_dir'])
+        if path:
+            srv.SETTINGS.update({'frame_dir': path, 'frame_on': True})
+        return srv.jsonr(state())
+
     async def geocode(request):
         q = request.query.get('q', '').strip()
         if len(q) < 2:
@@ -189,6 +197,7 @@ def routes(srv):
         web.post(r'/api/settings/clear/{kind:clock|track}', local_only(clear)),
         web.post(r'/api/settings/open/{kind:clock|track}', local_only(open_folder)),
         web.get('/api/settings/geocode', local_only(geocode)),
+        web.post('/api/settings/frame/pick', local_only(frame_pick)),
         web.get('/api/settings/adb', local_only(adb_status)),
         web.post('/api/settings/adb/download', local_only(adb_download)),
         web.post('/api/settings/adb/install', local_only(adb_install)),

@@ -8,7 +8,7 @@ PY="${PYTHON:-$SRC/.venv/Scripts/python}"
 B="${BUILD_DIR:-${TMPDIR:-/tmp}/np-pyi}"
 rm -rf "$B"; mkdir -p "$B"
 cp "$SRC/server.py" "$SRC/background.py" "$SRC/clips.py" "$SRC/yandex.py" "$SRC/updater.py" "$SRC/volume.py" \
-   "$SRC/settings.py" "$SRC/settings_web.py" "$SRC/weather.py" "$SRC/adbtool.py" "$SRC/pulse.py" "$SRC/widgets.py" "$SRC/pcstate.py" "$SRC/calendar_ics.py" \
+   "$SRC/settings.py" "$SRC/settings_web.py" "$SRC/weather.py" "$SRC/adbtool.py" "$SRC/pulse.py" "$SRC/widgets.py" "$SRC/pcstate.py" "$SRC/calendar_ics.py" "$SRC/photoframe.py" \
    "$SRC/nowplaying_app.py" "$SRC/icon.png" "$SRC/icon.ico" "$B/"
 cp -r "$SRC/settings_ui" "$B/"
 # приложение для планшета внутри программы — для установки через adb из окна настроек

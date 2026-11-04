@@ -43,7 +43,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-1.13.apk` for the tablet.
+- `NowPlaying-2.0.apk` for the tablet.
 
 ### 1. Server on the PC
 
@@ -70,7 +70,7 @@ Tray menu (right-click the icon):
 
 ### 2. App on the tablet
 
-Copy `NowPlaying-1.13.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
+Copy `NowPlaying-2.0.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
 
 Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on its own** and starts showing your music. If it doesn't, long-press the screen and enter the address shown in the tray menu on the PC.
 
@@ -82,6 +82,8 @@ Click the tray icon (or «Настройки…» in its menu) to open the setti
 - **Clock:** your own photo, GIF or video, its dimming, night mode hours, when to turn the screen off.
 - **Weather** under the date, from [Open-Meteo](https://open-meteo.com) (no account): turn it on and pick your city.
 - **Widgets** on the clock screen: weather now, a forecast (by hour or for 3 days), PC load (CPU, memory, GPU temperature), upcoming calendar events (any iCal link, e.g. Google Calendar's secret address), a second city's time, a countdown to a date, a short note. Pick a layout (a row under the clock, a column on the right, or the four corners), a style (card, outline or no background) and what goes in each place.
+- **Photo frame:** photos from any folder on the PC change under the clock (every minute, 5, 15, 30 minutes or an hour).
+- **Sunrise alarm:** the tablet rings, and 10–30 minutes before that the screen slowly brightens from deep red to warm yellow. Pick the days; it can also start the music on the PC when it rings.
 - **Resume:** when music is paused, the clock shows a card with the last track's cover and title. Tap it to keep playing.
 - **Wake on LAN:** when the PC is off, the clock shows a «Включить компьютер» (turn on the computer) button. It works when the PC is connected to the router by cable and waking from the network is allowed in the BIOS and in the network card's power settings.
 - **Tablet:** is it online, and installing the app over adb by USB or Wi-Fi. If adb isn't installed, the window offers to download Google's official platform-tools (about 7 MB).
@@ -102,7 +104,7 @@ Every 6 hours the server checks the [latest release](../../releases/latest) on G
 | Swipe right | previous track |
 | Long press | enter the PC address manually |
 | Tap «Включить компьютер» | wake the PC over the network (Wake on LAN) |
-| Tap the clock screen | timer: pick minutes; while it runs, pause, add 1 or 5 minutes, or reset |
+| Tap the clock screen | timer or pomodoro (25 minutes of work, 5 of break, 15 after four rounds): pick one; while it runs, pause, add 1 or 5 minutes or skip to the next phase, reset |
 | Drag up/down on the cover | PC volume |
 | Drag up/down on the lyrics | scroll the lyrics; after 3 s they return to the current line |
 | Tap a line while the lyrics are scrolled | jump to that line (synced lyrics only) |

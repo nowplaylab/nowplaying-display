@@ -4,6 +4,7 @@
 вида на планшете, отдаётся ему в /api/now (ключ ui) — планшет применяет её сразу.
 """
 import json
+import re
 import os
 import threading
 
@@ -19,6 +20,9 @@ DEFAULTS = {
     'shadow': True,           # тень под обложкой
     'pulse': True,            # свечение за обложкой «дышит» под музыку
     # экран часов
+    'frame_on': False,             # фоторамка: фото из папки по очереди вместо своего фона
+    'frame_dir': '',
+    'frame_every': 5,              # менять фото раз в столько минут
     'clock_bg': True,         # показывать свой фон (самый новый файл из папки)
     'clock_dim': 35,          # затемнение фона часов, %
     'night': True,            # ночью красные тусклые часы
@@ -41,6 +45,11 @@ DEFAULTS = {
     'countdown_date': '',          # ГГГГ-ММ-ДД
     'note_text': '',
     'calendar_url': '',            # ссылка на календарь в формате iCal (у Google — «секретный адрес»)
+    'alarm_on': False,             # будильник на планшете
+    'alarm_time': '07:30',
+    'alarm_days': '12345',         # дни недели цифрами: 1 — пн … 7 — вс
+    'alarm_sunrise': 20,           # рассвет: экран светлеет за столько минут до звонка (0 — без рассвета)
+    'alarm_music': False,          # в момент звонка включить музыку на ПК
     'resume': True,                # карточка «Продолжить» на часах, когда музыка на паузе
     'wol': True,                   # кнопка «Включить компьютер», когда ПК не отвечает
     # программа
@@ -48,7 +57,8 @@ DEFAULTS = {
 }
 
 # то, что нужно планшету
-UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume')
+UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume',
+           'alarm_on', 'alarm_time', 'alarm_days', 'alarm_sunrise', 'alarm_music')
 
 
 class Settings:
@@ -96,7 +106,7 @@ class Settings:
                 except (TypeError, ValueError):
                     continue
             elif isinstance(d, str):
-                v = str(v)[:1000 if k == 'calendar_url' else 200]
+                v = str(v)[:1000 if k in ('calendar_url', 'frame_dir') else 200]
             clean[k] = v
         if 'widget_slots' in changes:
             v = changes['widget_slots']
@@ -115,6 +125,14 @@ class Settings:
             clean.pop('city_tz')
         if clean.get('countdown_date') and not widgets.DATE_RE.match(clean['countdown_date']):
             clean.pop('countdown_date')
+        if 'alarm_time' in clean and not re.match(r'^([01]\d|2[0-3]):[0-5]\d$', clean['alarm_time']):
+            clean.pop('alarm_time')
+        if 'alarm_days' in clean:
+            clean['alarm_days'] = ''.join(d for d in '1234567' if d in clean['alarm_days'])
+        if clean.get('alarm_sunrise', 20) not in (0, 10, 20, 30):
+            clean.pop('alarm_sunrise')
+        if clean.get('frame_every', 5) not in (1, 5, 15, 30, 60):
+            clean.pop('frame_every')
         if 'calendar_url' in clean:
             clean['calendar_url'] = clean['calendar_url'].strip()
             if not calendar_ics.valid_url(clean['calendar_url']):

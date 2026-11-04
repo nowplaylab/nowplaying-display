@@ -215,6 +215,7 @@ a.btn { color: var(--text); text-decoration: none; }
       <a href="#track" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="8" height="8" rx="1.5"/><path d="M14 7h7M14 11h5M3 17h18"/></svg>Экран трека</a>
       <a href="#clock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Часы</a>
       <a href="#widgets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3.5" width="18" height="9" rx="2"/><rect x="3" y="15" width="8" height="5.5" rx="1.5"/><rect x="13" y="15" width="8" height="5.5" rx="1.5"/></svg>Виджеты</a>
+      <a href="#alarm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M5 4 2.5 6.5M19 4l2.5 2.5"/></svg>Будильник</a>
       <a href="#weather"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.3 3.4 3.4 0 0 0 7 18Z"/></svg>Погода</a>
       <a href="#tablet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M19 12h.01"/></svg>Планшет</a>
       <a href="#app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Программа</a>
@@ -303,6 +304,18 @@ a.btn { color: var(--text); text-decoration: none; }
           </div>
         </div>
         <div class="row">
+          <div class="t"><b>Фоторамка</b><small id="frameSub">Фото из папки на компе сменяют друг друга под часами. Пока включена, свой фон не показывается</small></div>
+          <label class="sw"><input type="checkbox" data-key="frame_on"><i></i></label>
+        </div>
+        <div class="row sub" id="frameRow">
+          <div class="t"><b id="frameDir">Папка не выбрана</b><small id="frameStatus"></small></div>
+          <select data-key="frame_every">
+            <option value="1">Каждую минуту</option><option value="5">Каждые 5 минут</option><option value="15">Каждые 15 минут</option>
+            <option value="30">Каждые полчаса</option><option value="60">Каждый час</option>
+          </select>
+          <button class="btn" id="framePick">Выбрать папку…</button>
+        </div>
+        <div class="row">
           <div class="t"><b>Затемнение фона</b><small>Чтобы цифры не терялись на ярком фоне</small></div>
           <div class="range"><input type="range" min="0" max="90" step="5" data-key="clock_dim"><output></output></div>
         </div>
@@ -388,6 +401,37 @@ a.btn { color: var(--text); text-decoration: none; }
         </div>
         <div class="row sub">
           <div class="note">Работает, если комп подключён к роутеру кабелем и пробуждение по сети разрешено: в BIOS (пункт Wake on LAN или Power On by PCI-E) и у сетевой карты в «Диспетчере устройств» → свойства → «Управление электропитанием».</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="alarm">
+      <h1>Будильник</h1>
+      <p class="lead">Звонит планшет. Перед звонком экран плавно светлеет, как рассвет.</p>
+      <div class="card">
+        <div class="row">
+          <div class="t"><b>Будильник</b><small id="alarmSub">Выключен</small></div>
+          <label class="sw"><input type="checkbox" data-key="alarm_on"><i></i></label>
+        </div>
+        <div class="row">
+          <div class="t"><b>Время</b></div>
+          <input class="field" type="time" id="alarmTime">
+        </div>
+        <div class="row">
+          <div class="t"><b>Дни</b><small>Нажми на день, чтобы включить или выключить</small></div>
+          <div class="seg" id="alarmDays">
+            <button data-day="1">Пн</button><button data-day="2">Вт</button><button data-day="3">Ср</button><button data-day="4">Чт</button><button data-day="5">Пт</button><button data-day="6">Сб</button><button data-day="7">Вс</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="t"><b>Рассвет</b><small>Экран планшета светлеет от тёмно-красного к тёплому жёлтому</small></div>
+          <select data-key="alarm_sunrise">
+            <option value="0">Без рассвета</option><option value="10">За 10 минут</option><option value="20">За 20 минут</option><option value="30">За 30 минут</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="t"><b>Включить музыку на компе</b><small>В момент звонка продолжит то, что стояло на паузе</small></div>
+          <label class="sw"><input type="checkbox" data-key="alarm_music"><i></i></label>
         </div>
       </div>
     </section>
@@ -544,6 +588,15 @@ function render(st) {
   if (document.activeElement !== $('#cdDate')) $('#cdDate').value = s.countdown_date;
   if (document.activeElement !== $('#noteText')) $('#noteText').value = s.note_text;
   if (document.activeElement !== $('#calUrl')) $('#calUrl').value = s.calendar_url;
+  $('#frameDir').textContent = s.frame_dir || 'Папка не выбрана';
+  if (document.activeElement !== $('#alarmTime')) $('#alarmTime').value = s.alarm_time;
+  for (const b of $$('[data-day]')) b.classList.toggle('on', s.alarm_days.includes(b.dataset.day));
+  const DAYS = { '12345': 'по будням', '67': 'по выходным', '1234567': 'каждый день' };
+  $('#alarmSub').textContent = !s.alarm_on ? 'Выключен'
+    : !s.alarm_days ? 'Не выбрано ни одного дня'
+    : 'В ' + s.alarm_time + ' ' + (DAYS[s.alarm_days] || [...s.alarm_days].map(d => ['пн','вт','ср','чт','пт','сб','вс'][d - 1]).join(', '));
+  $('#frameStatus').textContent = st.frame.status + (st.frame.name ? ', сейчас: ' + st.frame.name : '');
+  $('#frameRow').style.opacity = s.frame_on ? 1 : .5;
   $('#calSub').textContent = st.calendar
     || 'Ссылка на календарь в формате iCal. В Google Календаре: настройки → твой календарь → «Секретный адрес в формате iCal»';
   $('#wolSub').textContent = st.wol.mac ? `Будит ${st.wol.name} (сетевая карта ${st.wol.mac}), когда он не отвечает`
@@ -657,6 +710,16 @@ $('#cdTitle').addEventListener('change', e => save({ countdown_title: e.target.v
 $('#cdDate').addEventListener('change', e => save({ countdown_date: e.target.value }));
 $('#noteText').addEventListener('change', e => save({ note_text: e.target.value.trim() }));
 $('#calUrl').addEventListener('change', e => save({ calendar_url: e.target.value.trim() }));
+$('#alarmTime').addEventListener('change', e => { if (e.target.value) save({ alarm_time: e.target.value }); });
+for (const b of $$('[data-day]')) b.addEventListener('click', () => {
+  const d = b.dataset.day, cur = S.settings.alarm_days;
+  save({ alarm_days: cur.includes(d) ? cur.replace(d, '') : cur + d });
+});
+$('#framePick').addEventListener('click', async () => {
+  $('#framePick').textContent = 'Выбираю…';
+  try { render(await api('/api/settings/frame/pick', { method: 'POST' })); }
+  finally { $('#framePick').textContent = 'Выбрать папку…'; }
+});
 let city2Timer;
 $('#city2Input').addEventListener('input', e => {
   clearTimeout(city2Timer);

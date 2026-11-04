@@ -177,6 +177,8 @@ public class MainActivity extends Activity {
     private static final long RING_MAX_MS = 90000;
     private long timerEnd;          // когда зазвонит (часы планшета, мс); 0 — не идёт
     private long timerLeft;         // сколько осталось, пока на паузе; 0 — не на паузе
+    private int pomoPhase = -1;     // помодоро: -1 — обычный таймер, 0 — работа, 1 — перерыв, 2 — длинный перерыв
+    private int pomoRound = 1;
     private boolean ringing;
     private long ringStarted, panelUntil;
     private LinearLayout timerPanel;
@@ -456,6 +458,12 @@ public class MainActivity extends Activity {
         bgLayer.setVisibility(View.GONE);
         root.addView(bgLayer, new FrameLayout.LayoutParams(-1, -1));
 
+        sunriseBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xff000000, 0xff000000});
+        sunrise = new View(this);
+        sunrise.setBackgroundDrawable(sunriseBg);
+        sunrise.setVisibility(View.GONE);
+        root.addView(sunrise, new FrameLayout.LayoutParams(-1, -1));
+
         // --- часы в простое ---
         idle = new LinearLayout(this);
         idle.setOrientation(LinearLayout.VERTICAL);
@@ -538,6 +546,9 @@ public class MainActivity extends Activity {
 
         timerEnd = prefs.getLong("timer_end", 0);
         timerLeft = prefs.getLong("timer_left", 0);
+        pomoPhase = prefs.getInt("pomo_phase", -1);
+        pomoRound = prefs.getInt("pomo_round", 1);
+        alarmFired = prefs.getLong("alarm_fired", 0);
 
         dark = new View(this);
         dark.setBackgroundColor(0xff000000);
@@ -778,7 +789,16 @@ public class MainActivity extends Activity {
         bgType = type;
         if ("image".equals(type)) {
             bgVideo.setVisibility(View.GONE);
-            bgImage.setImageBitmap(bmp);
+            Drawable from = bgImage.getDrawable();
+            if (from instanceof TransitionDrawable) from = ((TransitionDrawable) from).getDrawable(1);
+            if (bmp != null && from instanceof BitmapDrawable) {   // фоторамка: новое фото проявляется поверх старого
+                TransitionDrawable t = new TransitionDrawable(new Drawable[]{from, new BitmapDrawable(getResources(), bmp)});
+                t.setCrossFadeEnabled(true);
+                bgImage.setImageDrawable(t);
+                t.startTransition(1500);
+            } else {
+                bgImage.setImageBitmap(bmp);
+            }
             bgReady = bmp != null;
         } else {
             bgImage.setImageDrawable(null);
@@ -1090,7 +1110,7 @@ public class MainActivity extends Activity {
     private void updateScreen(boolean idleNow, long t) {
         boolean night = isNight();
         boolean darkNow = idleNow && darkAfterMs > 0 && t - idleSince > darkAfterMs && t > wakeUntil
-                && !timerActive() && !ringing;
+                && !timerActive() && !ringing && !sunriseOn;
         dark.setVisibility(darkNow ? View.VISIBLE : View.GONE);
         if (nightShown == null || nightShown != night) {
             // ночью часы тёмно-красные (не слепят и не светят в комнату), фон затемнён сильнее
@@ -1106,7 +1126,8 @@ public class MainActivity extends Activity {
         syncBgVideo(idleNow && !darkNow);
         syncClip(!idleNow && !darkNow);
         float b;
-        if (ringing) b = night ? 0.2f : 0.7f;
+        if (sunriseOn) b = 0.02f + 0.78f * Math.max(0, sunriseShown);
+        else if (ringing) b = night ? 0.2f : 0.7f;
         else if (darkNow) b = 0.0f;
         else if (idleNow) b = night ? 0.02f : (bgReady ? 0.35f : 0.15f);  // с фоном днём ярче, иначе его не видно
         else b = night ? 0.10f : -1f;    // -1 — яркость, выбранная в настройках
@@ -1133,7 +1154,9 @@ public class MainActivity extends Activity {
     }
 
     private void saveTimer() {
-        prefs.edit().putLong("timer_end", timerEnd).putLong("timer_left", timerLeft).commit();
+        if (!timerActive()) pomoPhase = -1;
+        prefs.edit().putLong("timer_end", timerEnd).putLong("timer_left", timerLeft)
+                .putInt("pomo_phase", pomoPhase).putInt("pomo_round", pomoRound).commit();
         clockTickNow();
     }
 
@@ -1143,6 +1166,7 @@ public class MainActivity extends Activity {
     }
 
     private void startTimer(int minutes) {
+        pomoPhase = -1;
         timerEnd = System.currentTimeMillis() + minutes * 60000L;
         timerLeft = 0;
         saveTimer();
@@ -1194,7 +1218,7 @@ public class MainActivity extends Activity {
     private void showTimerPanel() {
         timerPanel.removeAllViews();
         TextView title = text(18, false, 170);
-        title.setText(timerActive() ? "Таймер" : "Таймер, минут");
+        title.setText(pomoPhase >= 0 ? "Помодоро" : timerActive() ? "Таймер" : "Таймер, минут");
         title.setPadding(dp(8), 0, dp(10), 0);
         timerPanel.addView(title);
         if (!timerActive()) {
@@ -1203,16 +1227,25 @@ public class MainActivity extends Activity {
                     public void onClick(View v) { startTimer(m); }
                 }));
             }
+            timerPanel.addView(chip("Помодоро", new View.OnClickListener() {
+                public void onClick(View v) { startPomodoro(); }
+            }));
         } else {
             timerPanel.addView(chip(timerLeft > 0 ? "Дальше" : "Пауза", new View.OnClickListener() {
                 public void onClick(View v) { pauseTimer(); }
             }));
-            timerPanel.addView(chip("+1 мин", new View.OnClickListener() {
-                public void onClick(View v) { addTimer(1); }
-            }));
-            timerPanel.addView(chip("+5 мин", new View.OnClickListener() {
-                public void onClick(View v) { addTimer(5); }
-            }));
+            if (pomoPhase >= 0) {
+                timerPanel.addView(chip(pomoPhase == 0 ? "К перерыву" : "К работе", new View.OnClickListener() {
+                    public void onClick(View v) { nextPomoPhase(false); showTimerPanel(); }
+                }));
+            } else {
+                timerPanel.addView(chip("+1 мин", new View.OnClickListener() {
+                    public void onClick(View v) { addTimer(1); }
+                }));
+                timerPanel.addView(chip("+5 мин", new View.OnClickListener() {
+                    public void onClick(View v) { addTimer(5); }
+                }));
+            }
             timerPanel.addView(chip("Сбросить", new View.OnClickListener() {
                 public void onClick(View v) { resetTimer(); }
             }));
@@ -1220,7 +1253,7 @@ public class MainActivity extends Activity {
         styleTimer(nightShown != null && nightShown);
         timerPanel.setVisibility(View.VISIBLE);
         setWidgetsAlpha(0f);   // панель встаёт на место виджетов
-        panelUntil = SystemClock.elapsedRealtime() + 8000;
+        panelUntil = SystemClock.elapsedRealtime() + 12000;
     }
 
     private void hideTimerPanel() {
@@ -1259,7 +1292,16 @@ public class MainActivity extends Activity {
 
     /** Раз в 100 мс: вовремя зазвонить, обновить плашку на экране трека, убрать забытую панель. */
     private void updateTimer(long t) {
-        if (timerEnd > 0 && System.currentTimeMillis() >= timerEnd) ring();
+        if (timerEnd > 0 && System.currentTimeMillis() >= timerEnd) {
+            if (pomoPhase >= 0) {
+                nextPomoPhase(true);
+            } else {
+                timerEnd = timerLeft = 0;
+                saveTimer();
+                ring("Время вышло");
+            }
+        }
+        updateAlarm(t);
         if (ringing && t - ringStarted > RING_MAX_MS) stopRing();
         boolean pill = timerActive() && player.getVisibility() == View.VISIBLE;
         if (pill) timerPill.setText(fmtLeft(timerRemaining()));
@@ -1267,22 +1309,36 @@ public class MainActivity extends Activity {
         if (timerPanel.getVisibility() == View.VISIBLE && t > panelUntil) hideTimerPanel();
     }
 
-    private void ring() {
-        timerEnd = timerLeft = 0;
-        saveTimer();
+    /** Большая надпись и маленькая подсказка под ней. */
+    private void showRingText(String title, String hint) {
+        android.text.SpannableString msg = new android.text.SpannableString(title + "\n" + hint);
+        int cut = title.length();
+        msg.setSpan(new android.text.style.RelativeSizeSpan(0.36f), cut, msg.length(), 0);
+        int hintColor = sunriseOn ? 0xd96b3010 : nightShown != null && nightShown ? 0x99a3281e : 0x99ffffff;
+        msg.setSpan(new android.text.style.ForegroundColorSpan(hintColor), cut, msg.length(), 0);
+        ringView.setText(msg);
+        ringView.setLineSpacing(dp(18), 1f);
+    }
+
+    /** Звонок до касания: конец таймера или будильник. */
+    private void ring(String title) {
         ringing = true;
         ringStarted = SystemClock.elapsedRealtime();
         hideTimerPanel();
-        android.text.SpannableString msg = new android.text.SpannableString("Время вышло\nнажми, чтобы выключить");
-        int cut = msg.toString().indexOf('\n');
-        msg.setSpan(new android.text.style.RelativeSizeSpan(0.36f), cut, msg.length(), 0);
-        msg.setSpan(new android.text.style.ForegroundColorSpan(nightShown != null && nightShown ? 0x99a3281e : 0x99ffffff),
-                cut, msg.length(), 0);
-        ringView.setText(msg);
-        ringView.setLineSpacing(dp(18), 1f);
+        showRingText(title, "нажми, чтобы выключить");
+        if (sunriseOn && sunriseColors != null) {   // будильник с рассветом: надпись на сплошном тёплом фоне
+            ringView.setBackgroundDrawable(new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, sunriseColors));
+        } else {
+            ringView.setBackgroundColor(0xe6000000);
+        }
         ringView.setVisibility(View.VISIBLE);
+        playSound(RingtoneManager.TYPE_ALARM, true);
+    }
+
+    /** Звук на потоке будильника; он не должен быть беззвучным — поднимаем хотя бы до 70%, потом возвращаем. */
+    private void playSound(int type, boolean loop) {
+        stopSound();
         try {
-            // звонок не должен быть беззвучным: поднимаем будильник хотя бы до 70% и потом возвращаем
             AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
             int max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM), cur = am.getStreamVolume(AudioManager.STREAM_ALARM);
             if (cur < max * 7 / 10) {
@@ -1290,22 +1346,25 @@ public class MainActivity extends Activity {
                 am.setStreamVolume(AudioManager.STREAM_ALARM, max * 7 / 10, 0);
             }
             ringPlayer = new MediaPlayer();
-            android.net.Uri uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            android.net.Uri uri = RingtoneManager.getDefaultUri(type);
             if (uri == null) uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             ringPlayer.setDataSource(this, uri);
             ringPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
-            ringPlayer.setLooping(true);
+            ringPlayer.setLooping(loop);
+            if (!loop) {
+                ringPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                    public void onCompletion(MediaPlayer mp) { stopSound(); }
+                });
+            }
             ringPlayer.prepare();
             ringPlayer.start();
         } catch (Exception e) {
-            android.util.Log.w("NowPlaying", "ring: " + e);
-            if (ringPlayer != null) { ringPlayer.release(); ringPlayer = null; }
+            android.util.Log.w("NowPlaying", "sound: " + e);
+            stopSound();
         }
     }
 
-    private void stopRing() {
-        ringing = false;
-        ringView.setVisibility(View.GONE);
+    private void stopSound() {
         if (ringPlayer != null) {
             try { ringPlayer.stop(); } catch (Exception ignored) { }
             ringPlayer.release();
@@ -1315,6 +1374,128 @@ public class MainActivity extends Activity {
             ((AudioManager) getSystemService(AUDIO_SERVICE)).setStreamVolume(AudioManager.STREAM_ALARM, ringVolumeWas, 0);
             ringVolumeWas = -1;
         }
+    }
+
+    private void stopRing() {
+        ringing = false;
+        ringView.setVisibility(View.GONE);
+        stopSound();
+    }
+
+    // ---------------- помодоро ----------------
+
+    private static final int POMO_WORK = 25, POMO_SHORT = 5, POMO_LONG = 15, POMO_ROUNDS = 4;
+
+    private void startPomodoro() {
+        pomoPhase = 0;
+        pomoRound = 1;
+        timerEnd = System.currentTimeMillis() + POMO_WORK * 60000L;
+        timerLeft = 0;
+        saveTimer();
+        hideTimerPanel();
+        flash("25 мин");
+    }
+
+    /** Фаза кончилась (или её пропустили): короткий сигнал и сразу следующая. */
+    private void nextPomoPhase(boolean sound) {
+        if (pomoPhase == 0) {
+            pomoPhase = pomoRound >= POMO_ROUNDS ? 2 : 1;
+        } else {
+            pomoRound = pomoPhase == 2 ? 1 : pomoRound + 1;
+            pomoPhase = 0;
+        }
+        int min = pomoPhase == 0 ? POMO_WORK : pomoPhase == 1 ? POMO_SHORT : POMO_LONG;
+        timerEnd = System.currentTimeMillis() + min * 60000L;
+        timerLeft = 0;
+        saveTimer();
+        if (sound) {
+            playSound(RingtoneManager.TYPE_NOTIFICATION, false);
+            wakeUntil = SystemClock.elapsedRealtime() + WAKE_ON_TAP_MS;
+        }
+        flash(pomoPhase == 0 ? "Работа" : "Перерыв");
+    }
+
+    private String pomoLine() {
+        String until = endFmt.format(new Date(timerEnd));
+        if (timerLeft > 0) return pomoPhase == 0 ? "Помодоро на паузе" : "Перерыв на паузе";
+        if (pomoPhase == 0) return "Работа, " + pomoRound + " из " + POMO_ROUNDS + ", до " + until;
+        return (pomoPhase == 2 ? "Длинный перерыв до " : "Перерыв до ") + until;
+    }
+
+    // ---------------- будильник с рассветом ----------------
+
+    private boolean alarmOn, alarmMusic;
+    private int alarmHour = 7, alarmMinute = 30, alarmSunriseMin = 20;
+    private String alarmDays = "12345";
+    private long alarmFired;        // какой звонок уже был (часы планшета, мс) — чтобы не звенеть дважды
+    private boolean sunriseOn;
+    private View sunrise;
+    private GradientDrawable sunriseBg;
+    private float sunriseShown = -1;
+    private int[] sunriseColors;
+
+    /** Ближайший звонок по часам планшета (как на экране), 0 — будильник выключен. */
+    private long nextAlarm(long now) {
+        if (!alarmOn || alarmDays.length() == 0) return 0;
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        c.setTimeInMillis(now);
+        c.set(java.util.Calendar.HOUR_OF_DAY, alarmHour);
+        c.set(java.util.Calendar.MINUTE, alarmMinute);
+        c.set(java.util.Calendar.SECOND, 0);
+        c.set(java.util.Calendar.MILLISECOND, 0);
+        c.add(java.util.Calendar.DAY_OF_MONTH, -1);
+        for (int d = -1; d <= 7; d++) {
+            long at = c.getTimeInMillis();
+            int dow = (c.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7 + 1;   // пн = 1 … вс = 7
+            // пропущенный давно (планшет был выключен) звонок не догоняем
+            if (alarmDays.indexOf((char) ('0' + dow)) >= 0 && at > alarmFired && at > now - 5 * 60000L) return at;
+            c.add(java.util.Calendar.DAY_OF_MONTH, 1);
+        }
+        return 0;
+    }
+
+    /** Раз в 100 мс: рассвет за N минут до звонка и сам звонок. */
+    private void updateAlarm(long t) {
+        long now = System.currentTimeMillis(), at = nextAlarm(now);
+        float p = -1;
+        if (at > 0 && now >= at) {
+            alarmFired = at;
+            prefs.edit().putLong("alarm_fired", at).commit();
+            if (alarmSunriseMin > 0) p = 1;
+            sunriseOn = p >= 0;
+            if (alarmMusic && connected && !pcLost && trackId != null && !playing) control("toggle");
+            ring("Доброе утро");
+        } else if (at > 0 && alarmSunriseMin > 0 && at - now <= alarmSunriseMin * 60000L) {
+            p = 1f - (at - now) / (alarmSunriseMin * 60000f);
+        } else if (ringing && sunriseOn) {
+            p = 1;   // пока звенит, рассвет держим
+        }
+        sunriseOn = p >= 0;
+        if (Math.abs(p - sunriseShown) > 0.002f) {
+            sunriseShown = p;
+            paintSunrise(p);
+        }
+    }
+
+    private static int mix(int a, int b, float k) {
+        k = Math.max(0, Math.min(1, k));
+        int ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255, aa = a >>> 24;
+        int br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255, ba = b >>> 24;
+        return ((int) (aa + (ba - aa) * k) << 24) | ((int) (ar + (br - ar) * k) << 16)
+                | ((int) (ag + (bg - ag) * k) << 8) | (int) (ab + (bb - ab) * k);
+    }
+
+    /** Рассвет: снизу тёплый свет поднимается от тёмно-красного к мягкому жёлтому. */
+    private void paintSunrise(float p) {
+        if (p < 0) {
+            sunrise.setVisibility(View.GONE);
+            return;
+        }
+        int bottom = p < 0.5f ? mix(0xff1a0503, 0xffc2441c, p * 2) : mix(0xffc2441c, 0xffffcf7a, p * 2 - 1);
+        int top = p < 0.5f ? mix(0xff000000, 0xff3d0c08, p * 2) : mix(0xff3d0c08, 0xffff9a52, p * 2 - 1);
+        sunriseColors = new int[]{top, mix(top, bottom, 0.6f), bottom};
+        sunriseBg.setColors(sunriseColors);
+        sunrise.setVisibility(View.VISIBLE);
     }
 
     /** Если экран «спит» — будим его на минуту и не считаем касание командой. */
@@ -1415,6 +1596,15 @@ public class MainActivity extends Activity {
         trackBgMode = mode;
         trackDim = u.optInt("track_dim", 55);
         resumeOn = u.optBoolean("resume", true);
+        alarmOn = u.optBoolean("alarm_on", false);
+        alarmMusic = u.optBoolean("alarm_music", false);
+        alarmSunriseMin = u.optInt("alarm_sunrise", 20);
+        alarmDays = u.optString("alarm_days", "12345");
+        String[] hm = u.optString("alarm_time", "07:30").split(":");
+        try {
+            alarmHour = Integer.parseInt(hm[0]);
+            alarmMinute = Integer.parseInt(hm[1]);
+        } catch (Exception ignored) { }
         clipDim.setBackgroundColor(dimColor(trackDim));
         clockDim = u.optInt("clock_dim", 35);
         nightOn = u.optBoolean("night", true);
@@ -1562,11 +1752,15 @@ public class MainActivity extends Activity {
             Date now = new Date();
             if (timerActive()) {
                 clock.setText(fmtLeft(timerRemaining()));
-                date.setText(timerLeft > 0 ? "Таймер на паузе" : "Таймер, звонок в " + endFmt.format(new Date(timerEnd)));
+                date.setText(pomoPhase >= 0 ? pomoLine()
+                        : timerLeft > 0 ? "Таймер на паузе" : "Таймер, звонок в " + endFmt.format(new Date(timerEnd)));
             } else {
                 clock.setText(clockFmt.format(now));
                 String d = dateFmt.format(now);
-                date.setText(d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1));
+                d = d.substring(0, 1).toUpperCase(new Locale("ru")) + d.substring(1);
+                long at = nextAlarm(now.getTime());
+                if (at > 0 && at - now.getTime() < 16 * 3600000L) d += ", будильник в " + endFmt.format(new Date(at));
+                date.setText(d);
             }
             if (now.getSeconds() == 0) moveClock(); // раз в минуту часы переезжают — чтобы экран не выгорал
             if (now.getSeconds() == 0) for (WidgetView w : slotViews) w.invalidate();   // второй город, календарь

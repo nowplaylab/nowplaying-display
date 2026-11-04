@@ -36,6 +36,7 @@ import background
 import clips
 import calendar_ics
 import pcstate
+import photoframe
 import pulse
 import settings
 import settings_web
@@ -45,7 +46,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '1.13'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.0'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -368,7 +369,7 @@ async def h_now(request):
     s['server_time_ms'] = int(now_ms())
     s['has_art'] = s['track_id'] in art
     s['lyrics_ready'] = s['track_id'] in lyrics
-    s['bg'] = BG.info() if SETTINGS['clock_bg'] else None
+    s['bg'] = FRAME.info() or (BG.info() if SETTINGS['clock_bg'] else None)   # фоторамка важнее своего фона
     s['clip'] = CLIPS.info(s['track_id'])          # видео из Яндекс Музыки (если включено)
     s['track_media'] = TRACK_BG.info() if SETTINGS['track_bg'] == 'custom' else None
     # размытая обложка: выбрана сама или как запасной фон, пока у трека нет видео из клипа
@@ -507,6 +508,7 @@ UPDATER = updater.Updater(VERSION)
 WEATHER = weather.Weather(SETTINGS)
 PC_STATE = pcstate.PcState(SETTINGS)
 CALENDAR = calendar_ics.Calendar(SETTINGS)
+FRAME = photoframe.PhotoFrame(SETTINGS)
 PULSE = pulse.Pulse()
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
@@ -578,6 +580,8 @@ async def h_clip(request):
 
 async def h_bg(request):
     c = BG.current
+    if FRAME.current and FRAME.current['id'] == request.match_info['id']:
+        c = FRAME.current
     if not c or c['id'] != request.match_info['id'] or c['ext'] != request.match_info['ext']:
         raise web.HTTPNotFound()
     return web.FileResponse(c['path'], headers={'Cache-Control': 'max-age=86400'})
@@ -593,6 +597,7 @@ async def on_startup(app):
     app['weather'] = asyncio.create_task(WEATHER.watch(app['http']))
     app['pcstate'] = asyncio.create_task(PC_STATE.watch())
     app['calendar'] = asyncio.create_task(CALENDAR.watch(app['http']))
+    app['frame'] = asyncio.create_task(FRAME.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
     loop = asyncio.get_running_loop()
     app['udp'], _ = await loop.create_datagram_endpoint(Discovery, local_addr=('0.0.0.0', UDP_PORT))
