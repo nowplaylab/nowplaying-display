@@ -2,6 +2,7 @@ package com.tab3.nowplaying;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
+import android.view.animation.DecelerateInterpolator;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -77,6 +78,9 @@ public class MainActivity extends Activity {
     private LinearLayout times;
     private VinylView vinyl;
     private String theme = "";
+    private LinearLayout growCol;           // колонка «Сцены»/«Минимала»: текст раздвигает её, когда находится
+    private ValueAnimator growAnim;
+    private boolean growShown;
     private boolean themeShadow = true;    // тень под обложкой возможна в этой теме
     private int coverShadowSize;
     private ImageView cover;
@@ -963,13 +967,17 @@ public class MainActivity extends Activity {
         unsynced.setGravity(Gravity.LEFT);
         lyrics.setCentered(false);
         lyrics.setTextSizeSp(26);
+        lyrics.setAlpha(1f);
+        if (growAnim != null) growAnim.cancel();
+        growCol = null;
         times.setVisibility(View.VISIBLE);
         vinyl.setSpinning(false);
         int screenH = Math.min(getResources().getDisplayMetrics().heightPixels, getResources().getDisplayMetrics().widthPixels);
 
         if ("scene".equals(t)) {
-            // обложка по центру сверху, под ней название и пара строк текста по центру
-            LinearLayout col = column(Gravity.CENTER_HORIZONTAL);
+            // обложка, название и полоска по центру экрана; когда приходит текст,
+            // блок уезжает вверх, а строки выдвигаются из-под полоски (см. sceneLyrics)
+            final LinearLayout col = column(Gravity.CENTER);
             col.setPadding(dp(48), dp(30), dp(48), dp(26));
             setCoverSize(dp(280), true);
             col.addView(coverFrame, coverParams(dp(280)));
@@ -982,18 +990,19 @@ public class MainActivity extends Activity {
             tp.topMargin = dp(14);
             col.addView(title, tp);
             col.addView(artist, lin(-1, -2, 0));
+            LinearLayout.LayoutParams pp = lin(dp(420), dp(3), 0);
+            pp.topMargin = dp(14);
+            col.addView(progress, pp);
             col.addView(unsynced, lin(-1, -2, 0));
             lyrics.setCentered(true);
             lyrics.setTextSizeSp(26);
-            LinearLayout.LayoutParams lp = lin(-1, 0, 1);
-            lp.topMargin = dp(8);
+            LinearLayout.LayoutParams lp = lin(-1, 0, 0);
+            lp.topMargin = dp(10);
             col.addView(lyrics, lp);
-            LinearLayout.LayoutParams pp = lin(dp(420), dp(3), 0);
-            pp.topMargin = dp(10);
-            col.addView(progress, pp);
             times.setVisibility(View.GONE);
             player.addView(col, new FrameLayout.LayoutParams(-1, -1));
             glowDrawable.setGradientCenter(0.5f, 0.28f);
+            attachGrow(col);
         } else if ("poster".equals(t)) {
             // обложка во всю высоту слева, без полей и тени; текст справа
             LinearLayout row = new LinearLayout(this);
@@ -1009,28 +1018,30 @@ public class MainActivity extends Activity {
             player.addView(row, new FrameLayout.LayoutParams(-1, -1));
             glowDrawable.setGradientCenter(0.3f, 0.5f);
         } else if ("minimal".equals(t)) {
-            // без обложки: крупная типографика и крупный текст песни
-            LinearLayout col = column(Gravity.LEFT);
-            col.setPadding(dp(64), dp(50), dp(64), dp(36));
+            // без обложки: крупная типографика по центру экрана; текст песни появляется
+            // между названием и полоской и раздвигает их (см. growLyrics)
+            final LinearLayout col = column(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+            col.setPadding(dp(64), dp(44), dp(64), dp(36));
             artist.setAllCaps(true);
             artist.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
             artist.setTextColor(Color.argb(150, 255, 255, 255));
             title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 56);
             title.setMaxLines(1);
-            col.addView(artist);
-            col.addView(title);
-            col.addView(unsynced);
+            col.addView(artist, lin(-1, -2, 0));
+            col.addView(title, lin(-1, -2, 0));
+            col.addView(unsynced, lin(-1, -2, 0));
             lyrics.setTextSizeSp(38);
-            LinearLayout.LayoutParams lp = lin(-1, 0, 1);
+            LinearLayout.LayoutParams lp = lin(-1, 0, 0);
             lp.topMargin = dp(20);
             lp.bottomMargin = dp(10);
             col.addView(lyrics, lp);
             LinearLayout.LayoutParams pp = lin(-1, dp(3), 0);
             pp.topMargin = dp(10);
             col.addView(progress, pp);
-            col.addView(times);
+            col.addView(times, lin(-1, -2, 0));
             player.addView(col, new FrameLayout.LayoutParams(-1, -1));
             glowDrawable.setGradientCenter(0.5f, 0.5f);
+            attachGrow(col);
         } else if ("vinyl".equals(t)) {
             // конверт-обложка слева, из него выезжает крутящаяся пластинка, текст справа
             FrameLayout stage = new FrameLayout(this);
@@ -1069,6 +1080,69 @@ public class MainActivity extends Activity {
             glowDrawable.setGradientCenter(0.23f, 0.5f);
         }
         glow.invalidate();
+    }
+
+    /** Колонка, в которой текст песни «вырастает» до свободного места, когда находится. */
+    private void attachGrow(final LinearLayout col) {
+        growCol = col;
+        col.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            public void onLayoutChange(View v, int l, int tt, int r, int b, int ol, int ot, int or, int ob) {
+                // размер экрана поменялся, а текст уже выехал — подогнать высоту
+                if (growCol != col || !growShown || (growAnim != null && growAnim.isRunning())) return;
+                final int h = growSpace();
+                if (h != ((LinearLayout.LayoutParams) lyrics.getLayoutParams()).height)
+                    col.post(new Runnable() { public void run() { if (growCol == col) setGrowH(h); } });
+            }
+        });
+        growLyrics(lyrics.hasLyrics(), false);
+    }
+
+    /** Сколько места под текст песни: высота колонки минус всё остальное. */
+    private int growSpace() {
+        int h = growCol.getHeight() - growCol.getPaddingTop() - growCol.getPaddingBottom();
+        for (int i = 0; i < growCol.getChildCount(); i++) {
+            View c = growCol.getChildAt(i);
+            if (c == lyrics || c.getVisibility() == View.GONE) continue;
+            LinearLayout.LayoutParams p = (LinearLayout.LayoutParams) c.getLayoutParams();
+            h -= c.getHeight() + p.topMargin + p.bottomMargin;
+        }
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) lyrics.getLayoutParams();
+        return Math.max(0, h - lp.topMargin - lp.bottomMargin);
+    }
+
+    private void setGrowH(int h) {
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) lyrics.getLayoutParams();
+        if (lp.height != h) { lp.height = h; lyrics.setLayoutParams(lp); }
+    }
+
+    /** «Сцена» и «Минимал»: без текста блок стоит по центру; когда текст находится, он
+     *  вырастает до свободного места и раздвигает остальное. */
+    private void growLyrics(boolean show, final boolean animate) {
+        if (growCol == null) return;
+        growShown = show;
+        if (growAnim != null) growAnim.cancel();
+        if (!show) { setGrowH(0); lyrics.setAlpha(0f); return; }
+        final LinearLayout col = growCol;
+        col.post(new Runnable() {
+            public void run() {
+                if (growCol != col || !growShown) return;
+                final int target = growSpace();
+                final int from = ((LinearLayout.LayoutParams) lyrics.getLayoutParams()).height;
+                if (!animate || target <= from) { setGrowH(target); lyrics.setAlpha(1f); return; }
+                growAnim = ValueAnimator.ofFloat(0f, 1f);
+                growAnim.setDuration(1100);
+                growAnim.setInterpolator(new DecelerateInterpolator(1.8f));
+                growAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    public void onAnimationUpdate(ValueAnimator va) {
+                        if (growCol != col) return;
+                        float f = va.getAnimatedFraction();
+                        setGrowH(from + Math.round((target - from) * f));
+                        lyrics.setAlpha(Math.min(1f, f * 1.4f));
+                    }
+                });
+                growAnim.start();
+            }
+        });
     }
 
     /** Картинка тени для обложки size×size с полями pad: размытие ~18 dp, 55%, сдвиг вниз 8 dp. */
@@ -2212,7 +2286,8 @@ public class MainActivity extends Activity {
             }
             try {
                 final JSONObject now = new JSONObject(new String(get("http://" + s + "/api/now?v=" + myVersion()
-                        + "&dev=" + deviceId() + "&name=" + java.net.URLEncoder.encode(android.os.Build.MODEL, "UTF-8"), 3000), "UTF-8"));
+                        + "&dev=" + deviceId() + "&name=" + java.net.URLEncoder.encode(android.os.Build.MODEL, "UTF-8")
+                        + (isTv() ? "&tv=1" : ""), 3000), "UTF-8"));
                 failures = 0;
                 ui.post(new Runnable() { public void run() { apply(now); } });
                 setStatus("");
@@ -2370,8 +2445,10 @@ public class MainActivity extends Activity {
             path = tm.has("url") ? tm.optString("url") : "/bg-track/" + tm.optString("id") + "." + tm.optString("ext", "mp4");
             type = tm.optString("type", "video");
         } else if (!j.isNull("clip") && j.optString("clip", "").length() > 0) {
-            nclip = "c:" + j.optString("clip");
-            path = "/clip/" + j.optString("clip") + ".mp4";
+            // телевизору сервер отдаёт клип в полном качестве, планшету — лёгкий и размытый
+            boolean hd = j.optBoolean("clip_hd");
+            nclip = (hd ? "h:" : "c:") + j.optString("clip");
+            path = "/clip/" + j.optString("clip") + (hd ? "-hd" : "") + ".mp4";
         }
         if (nclip == null ? clipId != null : !nclip.equals(clipId)) {
             clipId = nclip;
@@ -2411,6 +2488,7 @@ public class MainActivity extends Activity {
             lyrics.setLyrics(null, new ArrayList<String>(), false);
             lyrics.setVisibility(View.GONE);
             unsynced.setVisibility(View.GONE);
+            growLyrics(false, false);
             loadTrackExtras(server, id);
             setCover(null);
             artRev = -1;
@@ -2425,6 +2503,23 @@ public class MainActivity extends Activity {
             artRev = rev;
             loadCover(server, id);  // сначала маленькая обложка из Windows, потом чёткая из iTunes
         }
+    }
+
+    private Boolean tv;
+
+    /** Телевизор (Android TV): ему клипы в полном качестве. */
+    private boolean isTv() {
+        if (tv == null) {
+            boolean t = false;
+            try {
+                android.app.UiModeManager um = (android.app.UiModeManager) getSystemService(UI_MODE_SERVICE);
+                t = um != null && um.getCurrentModeType() == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION;
+                t = t || getPackageManager().hasSystemFeature("android.software.leanback");
+            } catch (Exception ignored) {
+            }
+            tv = t;
+        }
+        return tv;
     }
 
     private void loadCover(final String srv, final String id) {
@@ -2470,6 +2565,7 @@ public class MainActivity extends Activity {
                                 lyrics.setLyrics(fs ? t : null, lines, fs);
                                 lyrics.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
                                 unsynced.setVisibility(!fs && !lines.isEmpty() ? View.VISIBLE : View.GONE);
+                                growLyrics(!lines.isEmpty(), true);
                             }
                         });
                         break;

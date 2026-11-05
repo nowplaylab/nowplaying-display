@@ -123,7 +123,7 @@ class Settings:
             return True
         return any(test(self.view(dev)) for dev in list(self.devices))
 
-    def seen(self, dev, model, ip, version):
+    def seen(self, dev, model, ip, version, tv=False):
         """Устройство спросило /api/now: запомнить его (и сохранить на диск не чаще раза в 5 минут)."""
         now = time.time()
         with self.lock:
@@ -131,10 +131,16 @@ class Settings:
             new = d is None
             if new:
                 d = self.devices[dev] = {'name': '', 'over': {}}
-            d.update(model=model[:60], ip=ip, seen=now, version=version[:20])
+            d.update(model=model[:60], ip=ip, seen=now, version=version[:20], tv=bool(tv))
             due = new or now - self._devices_saved > SEEN_SAVE_EVERY
         if due:
             self._save_devices()
+
+    def has_tv(self, days=7):
+        """Был ли за последние дни хоть один телевизор: тогда клипам нужна версия в полном качестве."""
+        now = time.time()
+        with self.lock:
+            return any(v.get('tv') and now - v.get('seen', 0) < days * 86400 for v in self.devices.values())
 
     def device_list(self):
         with self.lock:

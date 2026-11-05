@@ -47,7 +47,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '2.2'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.3'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -364,8 +364,9 @@ def jsonr(data):
 
 async def h_now(request):
     dev = request.query.get('dev', '')[:40] or None
+    tv = request.query.get('tv') == '1'
     if dev and request.query.get('v'):
-        SETTINGS.seen(dev, request.query.get('name', ''), request.remote or '', request.query['v'])
+        SETTINGS.seen(dev, request.query.get('name', ''), request.remote or '', request.query['v'], tv)
     S = SETTINGS.view(dev)    # общие настройки и поверх — свои у этого устройства
     s = dict(state)
     if s['playing'] and s['duration_ms']:
@@ -375,7 +376,12 @@ async def h_now(request):
     s['has_art'] = s['track_id'] in art
     s['lyrics_ready'] = s['track_id'] in lyrics
     s['bg'] = (FRAME.info() if S['frame_on'] else None) or (BG.info() if S['clock_bg'] else None)   # фоторамка важнее своего фона
-    s['clip'] = CLIPS.info(s['track_id'])          # видео из Яндекс Музыки (если включено)
+    if tv:   # телевизору — видео в полном качестве; у уже скачанного трека доделаем его
+        if s['track_id'] in CLIPS.ready and s['duration_ms']:
+            CLIPS.request(request.app['http'], s['track_id'], s['title'], s['artist'], s['duration_ms'])
+        s['clip'], s['clip_hd'] = CLIPS.info_tv(s['track_id'])
+    else:
+        s['clip'] = CLIPS.info(s['track_id'])      # видео из Яндекс Музыки (если включено)
     s['track_media'] = TRACK_BG.info() if S['track_bg'] == 'custom' else None
     # размытая обложка: выбрана сама или как запасной фон, пока у трека нет видео из клипа
     fallback_blur = S['track_bg'] == 'video' and not s['clip'] and S['video_fallback'] == 'blur'
@@ -509,6 +515,7 @@ BG = background.Background()
 TRACK_BG = background.Background(src_dir=os.path.join(background.default_dir(), 'track'),
                                  cache_dir=os.path.join(os.path.dirname(BG.cache_dir), 'bg_track'))
 CLIPS = clips.Clips()
+CLIPS.want_hd = lambda: SETTINGS.has_tv()
 UPDATER = updater.Updater(VERSION)
 WEATHER = weather.Weather(SETTINGS)
 PC_STATE = pcstate.PcState(SETTINGS)
@@ -599,7 +606,7 @@ async def h_apk(request):
 
 
 async def h_clip(request):
-    path = CLIPS.ready.get(request.match_info['id'])
+    path = (CLIPS.ready_hd if request.match_info.get('hd') else CLIPS.ready).get(request.match_info['id'])
     if not path or not os.path.exists(path):
         raise web.HTTPNotFound()
     CLIPS.touch(request.match_info['id'])
@@ -664,7 +671,7 @@ def create_app():
         web.get(r'/api/control/seek/{ms:\d{1,9}}', h_seek),
         web.get(r'/api/control/volume/{level:\d{1,3}}', h_volume),
         web.get(r'/bg/{id:[0-9a-f]{12}}.{ext:jpg|mp4}', h_bg),
-        web.get(r'/clip/{id:[0-9a-f]{12}}.mp4', h_clip),
+        web.get(r'/clip/{id:[0-9a-f]{12}}{hd:(-hd)?}.mp4', h_clip),
         web.get('/update/app.apk', h_apk),
         web.get('/api/pulse', h_pulse),
         web.get('/api/bands', h_bands),
