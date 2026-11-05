@@ -70,6 +70,7 @@ def routes(srv):
             'devices': srv.SETTINGS.device_list(),
             'device_keys': list(settings.DEVICE_KEYS),
             'version': srv.VERSION,
+            'vlc': srv.VLC.status,
             'clock_media': media_info(srv.BG),
             'track_media': media_info(srv.TRACK_BG),
             'preparing': {'clock': bool(srv.BG.pending), 'track': bool(srv.TRACK_BG.pending)},

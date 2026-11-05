@@ -21,7 +21,7 @@ Turns an old Android tablet (tested on a Samsung Galaxy Tab 3 Lite, Android 4.2)
 
 *Screenshots taken on a Galaxy Tab 3 Lite (1024×600).*
 
-Works with any player that shows up in the Windows media overlay (the "Now Playing" panel): Yandex Music, Spotify, music in a browser and so on. Clips shorter than 45 seconds, TikTok and YouTube Shorts are ignored.
+Works with any player that shows up in the Windows media overlay (the "Now Playing" panel): Yandex Music, Spotify, music in a browser and so on. VLC is supported too: it does not show up in that panel, so the server turns on VLC's built-in web interface (local only, with a random password) — restart VLC once after the first launch. Clips shorter than 45 seconds, TikTok and YouTube Shorts are ignored.
 
 ```
 Player on the PC ──► Windows media overlay ──► server on the PC ──Wi-Fi──► app on the tablet

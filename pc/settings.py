@@ -21,6 +21,11 @@ DEFAULTS = {
     'shadow': True,           # тень под обложкой
     'pulse': True,            # свечение за обложкой «дышит» под музыку
     'visualizer': 'off',      # полосы частот внизу экрана трека: off, bars, wave, dots
+    # цвет экрана: поправка под матрицу устройства (у каждого своя), 0 — без поправки
+    'color_sat': 0,           # насыщенность, % к обычной: -50…+100
+    'color_contrast': 0,      # контраст, %: -50…+50
+    'color_bright': 0,        # яркость, %: -30…+30
+    'color_warm': 0,          # тепло: -50 (холоднее) … +50 (теплее)
     # экран часов
     'frame_on': False,             # фоторамка: фото из папки по очереди вместо своего фона
     'frame_dir': '',
@@ -60,7 +65,8 @@ DEFAULTS = {
 
 # то, что нужно планшету
 UI_KEYS = ('theme', 'track_bg', 'track_dim', 'shadow', 'pulse', 'visualizer', 'clock_dim', 'night', 'night_from', 'night_to', 'dark_after_min', 'resume',
-           'alarm_on', 'alarm_time', 'alarm_days', 'alarm_sunrise', 'alarm_music')
+           'alarm_on', 'alarm_time', 'alarm_days', 'alarm_sunrise', 'alarm_music',
+           'color_sat', 'color_contrast', 'color_bright', 'color_warm')
 
 
 # что можно задать каждому устройству отдельно; остальное (погода, календарь, папки, программа) — общее
@@ -283,7 +289,8 @@ class Settings:
         if clean.get('theme', 'classic') not in ('classic', 'scene', 'poster', 'minimal', 'vinyl'):
             clean.pop('theme')
         for k, lo, hi in (('track_dim', 0, 90), ('clock_dim', 0, 90), ('night_from', 0, 23),
-                          ('night_to', 0, 23), ('dark_after_min', 0, 720)):
+                          ('night_to', 0, 23), ('dark_after_min', 0, 720), ('color_sat', -50, 100),
+                          ('color_contrast', -50, 50), ('color_bright', -30, 30), ('color_warm', -50, 50)):
             if k in clean:
                 clean[k] = max(lo, min(hi, clean[k]))
         return clean

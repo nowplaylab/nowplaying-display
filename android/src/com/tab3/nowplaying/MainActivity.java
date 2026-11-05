@@ -12,6 +12,8 @@ import android.graphics.BitmapFactory;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorMatrix;
+import android.graphics.ColorMatrixColorFilter;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
@@ -1843,6 +1845,7 @@ public class MainActivity extends Activity {
         darkAfterMs = u.optInt("dark_after_min", 30) * 60L * 1000;
         pulseOn = u.optBoolean("pulse", false);
         applyTheme(u.optString("theme", "classic"));
+        applyColor(u.optInt("color_sat", 0), u.optInt("color_contrast", 0), u.optInt("color_bright", 0), u.optInt("color_warm", 0));
         boolean sh = u.optBoolean("shadow", true);
         if (sh != shadowOn) {
             shadowOn = sh;
@@ -2503,6 +2506,34 @@ public class MainActivity extends Activity {
             artRev = rev;
             loadCover(server, id);  // сначала маленькая обложка из Windows, потом чёткая из iTunes
         }
+    }
+
+    private String colorKey = "0,0,0,0";
+
+    /** Поправка цвета под экран устройства (из окна настроек на ПК): насыщенность, контраст,
+     *  яркость и тепло. Весь экран приложения рисуется в слой видеокарты, а слой выводится
+     *  через цветовой фильтр. Без поправки слоя нет, лишней работы тоже. Видео (SurfaceView)
+     *  идёт мимо приложения и не меняется. */
+    private void applyColor(int sat, int contrast, int bright, int warm) {
+        String key = sat + "," + contrast + "," + bright + "," + warm;
+        if (key.equals(colorKey)) return;
+        colorKey = key;
+        if (sat == 0 && contrast == 0 && bright == 0 && warm == 0) {
+            root.setLayerType(View.LAYER_TYPE_NONE, null);
+            return;
+        }
+        ColorMatrix m = new ColorMatrix();
+        m.setSaturation(1f + sat / 100f);
+        float c = 1f + contrast / 100f, t = 127.5f * (1f - c) + bright * 2.55f;
+        float w = warm / 200f;
+        m.postConcat(new ColorMatrix(new float[]{
+                c * (1 + w), 0, 0, 0, t,
+                0, c, 0, 0, t,
+                0, 0, c * (1 - w), 0, t,
+                0, 0, 0, 1, 0}));
+        Paint p = new Paint();
+        p.setColorFilter(new ColorMatrixColorFilter(m));
+        root.setLayerType(View.LAYER_TYPE_HARDWARE, p);
     }
 
     private Boolean tv;

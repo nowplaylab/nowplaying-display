@@ -513,6 +513,28 @@ a.btn { color: var(--text); text-decoration: none; }
           </div>
         </div>
       </div>
+      <div class="card" id="colorCard">
+        <div class="row">
+          <div class="t"><b>Цвет экрана</b><small>Поправка под экран устройства: у старых матриц цвета бледнее, чем на компьютере. Выбери устройство вверху — у каждого своя. Видео (клип и свой фон) не меняется</small></div>
+          <button class="btn" id="colorReset">Сбросить</button>
+        </div>
+        <div class="row">
+          <div class="t"><b>Насыщенность</b><small>Сочнее или спокойнее</small></div>
+          <div class="range"><input type="range" min="-50" max="100" step="5" data-key="color_sat" data-signed="1"><output></output></div>
+        </div>
+        <div class="row">
+          <div class="t"><b>Контраст</b><small>Глубже тёмное и ярче светлое</small></div>
+          <div class="range"><input type="range" min="-50" max="50" step="5" data-key="color_contrast" data-signed="1"><output></output></div>
+        </div>
+        <div class="row">
+          <div class="t"><b>Яркость</b><small>Светлее или темнее всё изображение</small></div>
+          <div class="range"><input type="range" min="-30" max="30" step="2" data-key="color_bright" data-signed="1"><output></output></div>
+        </div>
+        <div class="row">
+          <div class="t"><b>Тепло</b><small>Меньше — холоднее, в синеву; больше — теплее, в желтизну</small></div>
+          <div class="range"><input type="range" min="-50" max="50" step="5" data-key="color_warm" data-signed="1" data-unit=""><output></output></div>
+        </div>
+      </div>
     </section>
 
     <section id="app">
@@ -522,6 +544,9 @@ a.btn { color: var(--text); text-decoration: none; }
         <div class="row">
           <div class="t"><b>Обновляться автоматически</b><small>Новая версия с GitHub ставится сама, когда музыка не играет. Приложение на планшете — тоже</small></div>
           <label class="sw"><input type="checkbox" data-key="auto_update"><i></i></label>
+        </div>
+        <div class="row" id="vlcRow" hidden>
+          <div class="t"><b>VLC</b><small id="vlcSub"></small></div>
         </div>
         <div class="row">
           <div class="t"><b>Автозапуск, журнал, брандмауэр</b><small>В меню значка ♫ рядом с часами Windows</small></div>
@@ -627,6 +652,10 @@ function render(st) {
   renderDevices(st);
   const s = st.settings;
   $('#ver').textContent = 'версия ' + st.version;
+  $('#vlcRow').hidden = !st.vlc || st.vlc === 'none';
+  $('#vlcSub').textContent = st.vlc === 'ok' ? 'Подключён: что играет в VLC, видно на планшете'
+    : st.vlc === 'ready' ? 'Подключится, когда запустишь VLC'
+    : 'Включил в VLC доступ для NowPlaying. Закрой и снова открой VLC — тогда его будет видно';
   for (const el of $$('[data-key]')) {
     const k = el.dataset.key;
     if (el.type === 'checkbox') el.checked = !!s[k];
@@ -696,7 +725,8 @@ function render(st) {
 
 function paintRange(el) {
   el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%');
-  el.nextElementSibling.textContent = el.value + '%';
+  const v = +el.value, unit = el.dataset.unit ?? '%';
+  el.nextElementSibling.textContent = (el.dataset.signed && v > 0 ? '+' : '') + v + unit;
 }
 
 for (const el of $$('[data-key]')) {
@@ -708,6 +738,7 @@ for (const el of $$('[data-key]')) {
   else if (el.tagName === 'SELECT') el.addEventListener('change', () => save({ [k]: +el.value }));
 }
 for (const m of $$('.theme')) m.addEventListener('click', () => save({ theme: m.dataset.theme }));
+$('#colorReset').addEventListener('click', () => save({ color_sat: 0, color_contrast: 0, color_bright: 0, color_warm: 0 }));
 for (const b of $$('[data-fallback]')) b.addEventListener('click', () => save({ video_fallback: b.dataset.fallback }));
 for (const m of $$('.mode')) m.addEventListener('click', () => {
   if (m.dataset.mode === 'custom' && !S.track_media) { pickKind = 'track'; $('#filePick').click(); }
