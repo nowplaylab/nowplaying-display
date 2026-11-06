@@ -26,8 +26,8 @@ if [ -z "$PY" ]; then
     NAME="cpython-3.12.16+$REL-$ARCH-apple-darwin-install_only.tar.gz"
     URL="https://github.com/astral-sh/python-build-standalone/releases/download/$REL"
     TMP="$(mktemp -d)"
-    curl -fsSL -o "$TMP/py.tgz" "$URL/$(printf %s "$NAME" | sed 's/+/%2B/')" \
-        && WANT=$(curl -fsSL "$URL/SHA256SUMS" | awk -v n="$NAME" '$2 == n {print $1}') \
+    curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors -o "$TMP/py.tgz" "$URL/$(printf %s "$NAME" | sed 's/+/%2B/')" \
+        && WANT=$(curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors "$URL/SHA256SUMS" | awk -v n="$NAME" '$2 == n {print $1}') \
         && GOT=$(shasum -a 256 "$TMP/py.tgz" | cut -d' ' -f1) \
         && [ -n "$WANT" ] && [ "$WANT" = "$GOT" ] \
         && tar -xzf "$TMP/py.tgz" -C "$ROOT" \
