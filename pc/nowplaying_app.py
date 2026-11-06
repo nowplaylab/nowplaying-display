@@ -342,7 +342,9 @@ def main():
 
     # один экземпляр (после обновления ждём, пока старая копия закроется)
     for attempt in range(40 if after_update else 1):
-        mutex = kernel32.CreateMutexW(None, False, 'Local\\NowPlayingServer')
+        # тестовая копия на другом порту (NP_HTTP_PORT) не мешает рабочей
+        port = os.environ.get('NP_HTTP_PORT', '')
+        mutex = kernel32.CreateMutexW(None, False, 'Local\\NowPlayingServer' + (f'-{port}' if port and port != '47801' else ''))
         if kernel32.GetLastError() != 183:  # ERROR_ALREADY_EXISTS
             break
         kernel32.CloseHandle(mutex)
