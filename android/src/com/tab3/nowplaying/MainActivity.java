@@ -224,6 +224,12 @@ public class MainActivity extends Activity {
                 | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED   // поверх экрана блокировки (без пароля)
                 | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
+        if (android.os.Build.VERSION.SDK_INT >= 27) {   // на новых Android флаги выше устарели
+            try {
+                android.app.Activity.class.getMethod("setShowWhenLocked", boolean.class).invoke(this, true);
+                android.app.Activity.class.getMethod("setTurnScreenOn", boolean.class).invoke(this, true);
+            } catch (Exception ignored) { }
+        }
         prefs = getSharedPreferences("np", MODE_PRIVATE);
         server = prefs.getString("server", null);
         installCrashRestart();
@@ -235,7 +241,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+        hideSystemBars();
         running = true;
         final int gen = ++generation;
         new Thread(new Runnable() { public void run() { networkLoop(gen); } }, "np-net").start();
@@ -1213,7 +1219,9 @@ public class MainActivity extends Activity {
                     if (count < 3) {
                         android.app.PendingIntent pi = android.app.PendingIntent.getActivity(MainActivity.this, 0,
                                 new android.content.Intent(MainActivity.this, MainActivity.class)
-                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK), 0);
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                // Android 12+ требует явно сказать, что PendingIntent неизменяемый (FLAG_IMMUTABLE)
+                                android.os.Build.VERSION.SDK_INT >= 23 ? 0x04000000 : 0);
                         ((android.app.AlarmManager) getSystemService(ALARM_SERVICE))
                                 .set(android.app.AlarmManager.RTC, now + 3000, pi);
                     }
@@ -1860,6 +1868,24 @@ public class MainActivity extends Activity {
             }
             visualizer.clear();
         }
+    }
+
+    /** Весь экран под приложение. На Android 4.4+ — «погружение»: прячем строку состояния,
+     *  кнопки и панель задач (на новых планшетах), они появляются от свайпа с края и сами
+     *  скрываются. На старых — только приглушаем (иначе первое касание уходит на показ кнопок). */
+    private void hideSystemBars() {
+        if (android.os.Build.VERSION.SDK_INT >= 19) {
+            // LAYOUT_STABLE | LAYOUT_HIDE_NAVIGATION | LAYOUT_FULLSCREEN | HIDE_NAVIGATION | FULLSCREEN | IMMERSIVE_STICKY
+            root.setSystemUiVisibility(0x100 | 0x200 | 0x400 | 0x2 | 0x4 | 0x1000);
+        } else {
+            root.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE);
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) hideSystemBars();   // после диалогов и шторки — снова на весь экран
     }
 
     /** Полосы нужны визуализатору или пятнам свечения. */

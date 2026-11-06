@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tab3.nowplaying"
-    android:versionCode="21"
-    android:versionName="2.6">
+    android:versionCode="22"
+    android:versionName="2.7">
 
-    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="23" />
+    <!-- targetSdk 34: новые Android (15+) не ставят приложения со старым targetSdk. Код по-прежнему
+         собирается против API 17, всё новое — через проверку версии -->
+    <uses-sdk android:minSdkVersion="16" android:targetSdkVersion="34" />
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- обновление приложения без root: окно установки (Android 8+) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- Android TV: экрана касаний нет, но ставиться можно; на планшетах ничего не меняется -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -18,12 +22,14 @@
         android:icon="@drawable/icon"
         android:banner="@drawable/banner"
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Holo.NoActionBar.Fullscreen">
         <activity
             android:name=".MainActivity"
             android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden"
-            android:launchMode="singleTask">
+            android:launchMode="singleTask"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -34,7 +40,7 @@
             android:authorities="com.tab3.nowplaying.apk"
             android:exported="false"
             android:grantUriPermissions="true" />
-        <receiver android:name=".BootReceiver">
+        <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
