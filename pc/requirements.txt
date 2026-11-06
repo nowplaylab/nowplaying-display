@@ -1,17 +1,18 @@
 aiohttp==3.14.5
 pillow==13.0.0
 truststore==0.10.5
-winrt-runtime==3.2.1
-winrt-Windows.Foundation==3.2.1
-winrt-Windows.Foundation.Collections==3.2.1
-winrt-Windows.Media.Control==3.2.1
-winrt-Windows.Storage.Streams==3.2.1
-pystray==0.19.5
+winrt-runtime==3.2.1; sys_platform == "win32"
+winrt-Windows.Foundation==3.2.1; sys_platform == "win32"
+winrt-Windows.Foundation.Collections==3.2.1; sys_platform == "win32"
+winrt-Windows.Media.Control==3.2.1; sys_platform == "win32"
+winrt-Windows.Storage.Streams==3.2.1; sys_platform == "win32"
+pystray==0.19.5; sys_platform == "win32"
 imageio-ffmpeg==0.6.0
-pycaw==20260927
+pycaw==20260927; sys_platform == "win32"
 psutil==7.2.2
 tzdata==2026.6
 icalendar==7.3.0
 recurring-ical-events==3.8.2
 soundcard==0.4.6
 numpy==2.5.4
+dbus-next==0.2.3; sys_platform == "linux"

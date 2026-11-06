@@ -31,6 +31,9 @@ class Pulse:
             self._thread.start()
 
     def _run(self):
+        import sys
+        if sys.platform != 'win32':
+            return self._run_capture()
         try:
             import comtypes
             from comtypes import CLSCTX_ALL
@@ -63,3 +66,27 @@ class Pulse:
         finally:
             meter = None
             comtypes.CoUninitialize()
+
+    def _run_capture(self):
+        """Linux/macOS: пик по захвату «что слышно в колонках» (soundcard). На macOS захвата
+        без дополнительного драйвера (BlackHole и т. п.) нет — тогда уровень просто 0."""
+        try:
+            import numpy as np
+            import soundcard as sc
+            mic = sc.get_microphone(id=str(sc.default_speaker().name), include_loopback=True)
+        except Exception as e:
+            log.warning('pulse: %s', e)
+            return
+        env, loud, avg = 0.0, 0.2, 0.0
+        try:
+            with mic.recorder(samplerate=48000, channels=2, blocksize=1600) as rec:
+                while self.active:
+                    peak = float(np.abs(rec.record(numframes=1600)).max())
+                    env = peak if peak > env else env * 0.86 + peak * 0.14
+                    loud = max(env, loud * 0.992, 0.04)
+                    avg = avg * 0.95 + env * 0.05
+                    punch = max(0.0, env - avg * 0.9) / max(0.02, loud - avg * 0.9)
+                    self.level = min(1.0, 0.3 * env / loud + 0.9 * punch)
+        except Exception as e:
+            log.warning('pulse: %s', e)
+        self.level = 0.0

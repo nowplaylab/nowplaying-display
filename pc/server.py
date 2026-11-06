@@ -26,11 +26,14 @@ import aiohttp
 from aiohttp import web
 from PIL import Image, ImageEnhance, ImageFilter
 import truststore  # проверка сертификатов через хранилище Windows (достраивает цепочки, как браузер)
-from winrt.windows.media.control import (
-    GlobalSystemMediaTransportControlsSessionManager as SessionManager,
-    GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
-)
-from winrt.windows.storage.streams import Buffer, InputStreamOptions
+if sys.platform == 'win32':   # панель «Сейчас играет» Windows
+    from winrt.windows.media.control import (
+        GlobalSystemMediaTransportControlsSessionManager as SessionManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
+    )
+    from winrt.windows.storage.streams import Buffer, InputStreamOptions
+else:                         # Linux — MPRIS, macOS — Apple Music и Spotify (см. media_mpris.py, media_mac.py)
+    SessionManager = Status = Buffer = InputStreamOptions = None
 
 import background
 import clips
@@ -231,12 +234,36 @@ async def improve_art(app, tid, title, artist):
 
 
 async def poll_loop(app):
+    if SessionManager is None:
+        return await poll_other(app)
     mgr = await SessionManager.request_async()
     current['mgr'] = mgr
     while True:
         try:
             await update_state(app, mgr)
         except Exception as e:  # сессия могла закрыться посреди опроса
+            log.debug('poll: %s', e)
+        await asyncio.sleep(POLL)
+
+
+async def poll_other(app):
+    """Linux и macOS: спрашиваем свой источник (MPRIS или AppleScript), потом VLC."""
+    while True:
+        try:
+            v, src = None, None
+            if MEDIA is not None:
+                v, src = await MEDIA.now(app['http']), MEDIA
+            vs = await VLC.now(app['http'])
+            if vs and (v is None or (vs['playing'] and not v['playing'])):
+                v, src = vs, VLC
+            junk = v and (JUNK.search(f"{v['title']} {v['artist']}") or 0 < v['dur_ms'] < MIN_TRACK_MS)
+            if v and not junk:
+                current.update(session=None, src=src)
+                await use_source(app, src, v)
+            else:
+                current.update(session=None, src=None)
+                state.update(track_id=None, playing=False, title='', artist='', album='', app='')
+        except Exception as e:
             log.debug('poll: %s', e)
         await asyncio.sleep(POLL)
 
@@ -257,10 +284,10 @@ async def update_state(app, mgr):
     # ничего не играет (или там пауза, а VLC играет)
     vs = await VLC.now(app['http'])
     if vs and (s is None or (vs['playing'] and s.get_playback_info().playback_status != Status.PLAYING)):
-        current.update(session=None, vlc=True)
-        await use_vlc(app, vs)
+        current.update(session=None, src=VLC)
+        await use_source(app, VLC, vs)
         return
-    current.update(session=s, vlc=False)
+    current.update(session=s, src=None)
     if s is None:
         state.update(track_id=None, playing=False, title='', artist='', album='', app='')
         return
@@ -422,28 +449,29 @@ async def current_volume():
     return VOLUME_CACHE['value']
 
 
-async def use_vlc(app, v):
-    """Трек из VLC: то же, что и для плееров Windows, только обложку отдаёт сам VLC."""
+async def use_source(app, src, v):
+    """Трек не из панели Windows (VLC, MPRIS на Linux, Music/Spotify на Mac): то же самое,
+    только обложку отдаёт сам источник."""
     title, artist = split_title(clean_title(v['title']), v['artist'])
-    tid = hashlib.sha1(f'vlc|{title}|{artist}'.encode()).hexdigest()[:12]
+    tid = hashlib.sha1(f'{src.name}|{title}|{artist}'.encode()).hexdigest()[:12]
     pos, dur = v['pos_ms'], v['dur_ms']
     if seek_hold.get('tid') == tid and now_ms() < seek_hold['until']:
         pos = seek_hold['pos'] + (now_ms() - seek_hold['at'] if v['playing'] else 0)
     if dur:
         pos = min(pos, dur)
     if tid != state['track_id']:
-        log.info('track: %s — %s [vlc]', artist, title)
+        log.info('track: %s — %s [%s]', artist, title, v.get('app') or src.name)
         state.update(color=art[tid][1] if tid in art else '#202020', colors=art[tid][2] if tid in art else None)
-    if tid not in art and v['art_url'] and VLC.art_for != tid:
-        VLC.art_for = tid
-        data = await VLC.art(app['http'], v['art_url'])
+    if tid not in art and v['art_url'] and src.art_for != tid:
+        src.art_for = tid
+        data = await src.art(app['http'], v['art_url'])
         if data:
             try:
                 jpeg, color, colors = await asyncio.get_running_loop().run_in_executor(None, process_art, data)
                 if tid not in art:
                     set_art(tid, jpeg, color, colors)
             except Exception as e:
-                log.warning('vlc art: %s', e)
+                log.warning('%s art: %s', src.name, e)
     if artist and tid not in itunes_jobs:
         itunes_jobs[tid] = asyncio.create_task(improve_art(app, tid, title, artist))
     if tid not in lyrics and tid not in lyrics_jobs:
@@ -451,7 +479,7 @@ async def use_vlc(app, v):
     if dur > 0:
         CLIPS.request(app['http'], tid, title, artist, dur)
     state.update(track_id=tid, playing=v['playing'], title=title, artist=artist, album=v['album'],
-                 app='vlc', position_ms=int(pos), duration_ms=int(dur), measured_at=now_ms())
+                 app=v.get('app') or src.name, position_ms=int(pos), duration_ms=int(dur), measured_at=now_ms())
 
 
 def control_session():
@@ -467,8 +495,8 @@ def control_session():
 
 async def h_seek(request):
     ms = int(request.match_info['ms'])
-    if current.get('vlc'):
-        ok = await VLC.command(request.app['http'], 'seek', val=str(ms // 1000))
+    if current.get('src'):
+        ok = await current['src'].seek(request.app['http'], ms)
     else:
         s = control_session()
         ok = await s.try_change_playback_position_async(ms * 10000)  # в «тиках» по 100 нс
@@ -492,9 +520,8 @@ async def h_volume(request):
 
 async def h_control(request):
     action = request.match_info['action']
-    if current.get('vlc'):
-        cmd = {'toggle': 'pl_pause', 'next': 'pl_next', 'prev': 'pl_previous'}[action]
-        return jsonr({'ok': await VLC.command(request.app['http'], cmd)})
+    if current.get('src'):
+        return jsonr({'ok': await current['src'].control(request.app['http'], action)})
     s = control_session()
     ok = await {'toggle': s.try_toggle_play_pause_async, 'next': s.try_skip_next_async,
                 'prev': s.try_skip_previous_async}[action]()
@@ -562,6 +589,14 @@ BG = background.Background()
 TRACK_BG = background.Background(src_dir=os.path.join(background.default_dir(), 'track'),
                                  cache_dir=os.path.join(os.path.dirname(BG.cache_dir), 'bg_track'))
 VLC = vlc.Vlc()
+if sys.platform.startswith('linux'):
+    import media_mpris
+    MEDIA = media_mpris.Mpris()
+elif sys.platform == 'darwin':
+    import media_mac
+    MEDIA = media_mac.MacMedia()
+else:
+    MEDIA = None   # на Windows — панель «Сейчас играет»
 CLIPS = clips.Clips()
 CLIPS.want_hd = lambda: SETTINGS.has_tv()
 UPDATER = updater.Updater(VERSION)

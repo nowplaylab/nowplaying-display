@@ -24,7 +24,21 @@ NO_WINDOW = 0x08000000 if sys.platform == 'win32' else 0
 
 
 def pick_folder(start=''):
-    """Окно Windows «Выбор папки». Возвращает путь или '' (отменили)."""
+    """Окно «Выбор папки». Возвращает путь или '' (отменили). Windows — PowerShell,
+    macOS — AppleScript, Linux — zenity (или kdialog)."""
+    if sys.platform == 'darwin':
+        r = subprocess.run(['osascript', '-e', 'POSIX path of (choose folder with prompt "Папка с фото для фоторамки")'],
+                           capture_output=True, text=True, timeout=600)
+        return r.stdout.strip().rstrip('/') if r.returncode == 0 else ''
+    if sys.platform != 'win32':
+        for cmd in (['zenity', '--file-selection', '--directory', '--title=Папка с фото для фоторамки'],
+                    ['kdialog', '--getexistingdirectory', start or os.path.expanduser('~')]):
+            try:
+                r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+                return r.stdout.strip() if r.returncode == 0 else ''
+            except FileNotFoundError:
+                continue
+        return ''
     start = start.replace("'", "''")
     script = (
         "Add-Type -AssemblyName System.Windows.Forms;"

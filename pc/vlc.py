@@ -39,6 +39,8 @@ def _read_opt(text, key):
 
 
 class Vlc:
+    name = 'vlc'
+
     def __init__(self):
         self.password = None
         self.port = PORT
@@ -154,6 +156,12 @@ class Vlc:
             return await self._get(http, '/art', raw=True)
         except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
             return None
+
+    async def control(self, http, action):
+        return await self.command(http, {'toggle': 'pl_pause', 'next': 'pl_next', 'prev': 'pl_previous'}[action])
+
+    async def seek(self, http, ms):
+        return await self.command(http, 'seek', val=str(int(ms) // 1000))
 
     async def command(self, http, cmd, **params):
         q = urllib.parse.urlencode(dict(command=cmd, **params))

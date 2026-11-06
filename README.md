@@ -37,8 +37,8 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 
 | | |
 |---|---|
-| **PC** | Windows 10 or 11. No need to install Python, it is built into the program |
-| **Tablet** | Android 4.1 or newer, on the same Wi-Fi network as the PC |
+| **PC** | Windows 10 or 11. No need to install Python, it is built into the program. macOS and Linux work too, see below |
+| **Tablet** | Android 4.1 or newer (recent Android and Android TV included), on the same Wi-Fi network as the PC |
 
 ## Installation
 
@@ -138,6 +138,16 @@ python -m venv .venv
 `nowplaying_app.py` runs the server with the tray icon; `server.py` runs just the server in a console.
 
 To build your own `NowPlayingServer.exe`, install PyInstaller (`.venv\Scripts\python -m pip install pyinstaller`) and run `sh pc/build_exe.sh` in Git Bash. The result goes to `release/`.
+
+### macOS and Linux
+
+There is no ready-made program for them yet: the server runs from source, but with one click.
+Download the source (green **Code → Download ZIP** button on the repository page) and unpack it.
+
+- **macOS.** Needs [Python 3](https://www.python.org/downloads/macos/). Open `tools/NowPlaying-mac.command` (if macOS refuses, right-click → Open). On the first run it installs what it needs, starts the server and opens the settings window. Tracks come from **Apple Music and Spotify**; macOS will ask whether Terminal may control them, allow it. Browsers and other players on a Mac are not visible.
+- **Linux.** Needs `python3` and `python3-venv`. Run `sh tools/nowplaying-linux.sh` from a desktop session. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
+
+On both systems the program does not update itself and cannot install the app over adb from the settings window. The glow and the visualizer work on a Mac only with an audio capture driver such as BlackHole.
 
 ## Building the app
 

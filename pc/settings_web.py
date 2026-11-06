@@ -171,7 +171,12 @@ def routes(srv):
 
     async def open_folder(request):
         kind = request.match_info['kind']
-        os.startfile((srv.BG if kind == 'clock' else srv.TRACK_BG).src_dir)
+        path = (srv.BG if kind == 'clock' else srv.TRACK_BG).src_dir
+        if sys.platform == 'win32':
+            os.startfile(path)
+        else:   # macOS — open, Linux — xdg-open
+            import subprocess
+            subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', path])
         return srv.jsonr({'ok': True})
 
     async def frame_pick(request):
