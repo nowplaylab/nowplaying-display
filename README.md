@@ -1,6 +1,6 @@
 # NowPlaying — a "Now Playing" screen for an old tablet
 
-**English** | [Русский](README.ru.md) | [Website](https://tryshyzov.github.io/nowplaying-display/)
+**English** | [Русский](README.ru.md) | [Website](https://nowplaylab.github.io/nowplaying-display/)
 
 <p align="center"><img src="docs/screenshots/demo.gif" width="560" alt="NowPlaying on a Galaxy Tab 3 Lite: track screen, music video, layouts and the clock"></p>
 

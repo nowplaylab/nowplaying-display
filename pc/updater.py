@@ -17,7 +17,7 @@ import aiohttp
 
 log = logging.getLogger('nowplaying')
 
-REPO = 'tryshyzov/nowplaying-display'
+REPO = 'nowplaylab/nowplaying-display'
 CHECK_EVERY = 6 * 3600
 
 

@@ -6,7 +6,7 @@
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$Repo = 'tryshyzov/nowplaying-display'
+$Repo = 'nowplaylab/nowplaying-display'
 $DataDir = Join-Path $env:LOCALAPPDATA 'NowPlaying'
 $UpdDir = Join-Path $DataDir 'update'
 $Check = $args -contains '-check'     # только показать, что поставится, ничего не меняя

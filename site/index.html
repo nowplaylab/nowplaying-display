@@ -191,7 +191,7 @@ footer a { color: var(--ink-2); }
     <a class="mark" href="#"><i aria-hidden="true"></i><span data-t="name">Сейчас играет</span></a>
     <nav>
       <a href="#setup" data-t="nav_setup">Как поставить</a>
-      <a class="gh" href="https://github.com/tryshyzov/nowplaying-display">GitHub</a>
+      <a class="gh" href="https://github.com/nowplaylab/nowplaying-display">GitHub</a>
       <button class="lang" type="button" id="lang" aria-label="English">EN</button>
     </nav>
   </header>
@@ -224,10 +224,10 @@ footer a { color: var(--ink-2); }
     </div>
     <div>
       <div class="get">
-        <a class="btn" data-dl="exe" href="https://github.com/tryshyzov/nowplaying-display/releases/latest">
+        <a class="btn" data-dl="exe" href="https://github.com/nowplaylab/nowplaying-display/releases/latest">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zm0 13L10.5 19.6v-7H3zm8.5 1.3L21 21v-8.4h-9.5zm0-15.6v7.3H21V3z"/></svg>
           <span data-t="dl_win">Скачать для Windows</span></a>
-        <a class="btn ghost" data-dl="apk" href="https://github.com/tryshyzov/nowplaying-display/releases/latest">
+        <a class="btn ghost" data-dl="apk" href="https://github.com/nowplaylab/nowplaying-display/releases/latest">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.5 9.3 19 6.7a.5.5 0 0 0-.9-.5l-1.5 2.6a9 9 0 0 0-9.2 0L5.9 6.2a.5.5 0 0 0-.9.5l1.5 2.6A8.4 8.4 0 0 0 3 16h18a8.4 8.4 0 0 0-3.5-6.7ZM8 13.2a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z"/></svg>
           <span data-t="dl_apk">Приложение для Android</span></a>
       </div>
@@ -265,8 +265,8 @@ footer a { color: var(--ink-2); }
     <div>
       <h2 data-t="setup_h">Как поставить</h2>
       <div class="get" style="margin-top:28px">
-        <a class="btn" data-dl="exe" href="https://github.com/tryshyzov/nowplaying-display/releases/latest"><span data-t="dl_win">Скачать для Windows</span></a>
-        <a class="btn ghost" data-dl="apk" href="https://github.com/tryshyzov/nowplaying-display/releases/latest"><span data-t="dl_apk">Приложение для Android</span></a>
+        <a class="btn" data-dl="exe" href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_win">Скачать для Windows</span></a>
+        <a class="btn ghost" data-dl="apk" href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_apk">Приложение для Android</span></a>
       </div>
       <p class="need" data-t="need">Нужны Windows 10 или 11 и планшет или телефон на Android 4.1 и новее в той же сети Wi‑Fi.</p>
     </div>
@@ -280,7 +280,7 @@ footer a { color: var(--ink-2); }
 
 <footer>
   <div class="wrap">
-    <p data-t="foot1">Открытый код на <a href="https://github.com/tryshyzov/nowplaying-display">GitHub</a>, лицензия MIT. Сделал <a href="https://github.com/tryshyzov">tryshyzov</a>.</p>
+    <p data-t="foot1">Открытый код на <a href="https://github.com/nowplaylab/nowplaying-display">GitHub</a>, лицензия MIT. Сделали <a href="https://github.com/tryshyzov">tryshyzov</a> и Claude.</p>
     <p data-t="foot2">Обложки — iTunes и Deezer, тексты — LRCLIB, видео — Яндекс Музыка, погода — Open-Meteo, шрифт — Inter. Проект не связан с Яндексом, Spotify или Apple.</p>
   </div>
 </footer>
@@ -328,7 +328,7 @@ const EN = {
   s1: 'Run the program on your PC', s1s: 'It lives in the tray, adds itself to startup and asks the firewall for permission.',
   s2: 'Install the app on the tablet', s2s: 'Copy the APK, or press “Install” in the settings window — over a cable or Wi‑Fi.',
   s3: 'Play some music', s3s: 'The tablet finds your PC on the network. Everything else happens on its own, updates included.',
-  foot1: 'Open source on <a href="https://github.com/tryshyzov/nowplaying-display">GitHub</a>, MIT license. Made by <a href="https://github.com/tryshyzov">tryshyzov</a>.',
+  foot1: 'Open source on <a href="https://github.com/nowplaylab/nowplaying-display">GitHub</a>, MIT license. Made by <a href="https://github.com/tryshyzov">tryshyzov</a> and Claude.',
   foot2: 'Covers: iTunes and Deezer. Lyrics: LRCLIB. Video: Yandex Music. Weather: Open-Meteo. Typeface: Inter. Not affiliated with Yandex, Spotify or Apple.',
 };
 const RU = {};
@@ -440,7 +440,7 @@ function tick() {
 setInterval(tick, 10000);
 
 // ---------- кнопки скачивания: файлы из последнего релиза ----------
-fetch('https://api.github.com/repos/tryshyzov/nowplaying-display/releases/latest')
+fetch('https://api.github.com/repos/nowplaylab/nowplaying-display/releases/latest')
   .then(r => r.ok ? r.json() : null)
   .then(rel => {
     if (!rel) return;
