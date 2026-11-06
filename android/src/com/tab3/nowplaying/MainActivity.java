@@ -1776,8 +1776,9 @@ public class MainActivity extends Activity {
             if (vis != (visualizer.getVisibility() == View.VISIBLE)) visualizer.setVisibility(vis ? View.VISIBLE : View.GONE);
             visualizer.setRunning(vis);
             boolean on = pulseOn && playerShown && playing && dark.getVisibility() != View.VISIBLE;
-            boolean spread = on;   // свечение всегда тремя пятнами по экрану (и с видео за треком тоже)
-            if (on && !spread) {
+            // свечение — три пятна по экрану, и только когда за треком нет видео; с видео его нет совсем
+            boolean spread = on && clipLayer.getVisibility() != View.VISIBLE;
+            if (false) {   // одно свечение за обложкой больше не показываем
                 float target = pulseLevel;
                 glowShown += (target - glowShown) * (target > glowShown ? 0.6f : 0.18f);
                 if (glow.getVisibility() != View.VISIBLE) glow.setVisibility(View.VISIBLE);
