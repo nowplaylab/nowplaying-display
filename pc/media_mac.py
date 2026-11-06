@@ -1,4 +1,4 @@
-"""macOS: что играет в Apple Music и Spotify — через AppleScript (osascript).
+"""macOS: что играет в Apple Music (или iTunes на macOS до 10.15) и Spotify — через AppleScript (osascript).
 
 Общей «панели Сейчас играет», доступной программам, у macOS нет (MediaRemote закрыт),
 поэтому спрашиваем плееры напрямую. Скрипт проверяет «is running» и не запускает плеер сам.
@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 import tempfile
+import time
 
 import aiohttp
 
@@ -27,20 +28,26 @@ end if
 return ""
 '''
 
-MUSIC = '''
-if application "Music" is running then
-  tell application "Music"
+def player_script(app):
+    """Apple Music (macOS 10.15+) и iTunes (до 10.15) понимают одни и те же команды."""
+    return '''
+if application "%s" is running then
+  tell application "%s"
     if player state is not stopped then
       set t to current track
-      return "Music" & (ASCII character 31) & (name of t) & (ASCII character 31) & (artist of t) & (ASCII character 31) & (album of t) & (ASCII character 31) & (player position as text) & (ASCII character 31) & (duration of t as text) & (ASCII character 31) & (player state as text) & (ASCII character 31) & ""
+      return "%s" & (ASCII character 31) & (name of t) & (ASCII character 31) & (artist of t) & (ASCII character 31) & (album of t) & (ASCII character 31) & (player position as text) & (ASCII character 31) & (duration of t as text) & (ASCII character 31) & (player state as text) & (ASCII character 31) & ""
     end if
   end tell
 end if
 return ""
-'''
+''' % (app, app, app)
+
+
+MUSIC = player_script('Music')
+ITUNES = player_script('iTunes')
 
 MUSIC_ART = '''
-tell application "Music"
+tell application "%s"
   set d to raw data of artwork 1 of current track
 end tell
 set f to open for access POSIX file "%s" with write permission
@@ -79,10 +86,26 @@ class MacMedia:
         self.art_for = None
         self.error = ''
         self.art_path = os.path.join(tempfile.gettempdir(), 'nowplaying-music-art')
+        self._found = None
+        self._found_at = 0
+
+    def _scripts(self):
+        """Только установленные плееры: если в скрипте упомянуть приложение, которого нет,
+        macOS при каждом опросе спрашивает «Где находится …?»."""
+        if self._found is None or time.time() - self._found_at > 300:
+            home = os.path.expanduser('~/Applications')
+            def has(name, *dirs):
+                return any(os.path.isdir(os.path.join(d, name + '.app')) for d in dirs)
+            self._found = [sc for sc, ok in (
+                (SPOTIFY, has('Spotify', '/Applications', home)),
+                (MUSIC, has('Music', '/System/Applications', '/Applications')),
+                (ITUNES, has('iTunes', '/Applications'))) if ok]
+            self._found_at = time.time()
+        return self._found
 
     async def now(self, http):
         found = []
-        for script in (SPOTIFY, MUSIC):
+        for script in self._scripts():
             out = await osascript(script)
             if not out:
                 continue
@@ -91,7 +114,7 @@ class MacMedia:
                 continue
             found.append({'app': p[0], 'title': p[1].strip(), 'artist': p[2].strip(), 'album': p[3].strip(),
                           'pos_ms': _num(p[4]) * 1000, 'dur_ms': _num(p[5]) * 1000, 'playing': p[6].strip() == 'playing',
-                          'art_url': p[7].strip() or ('music-artwork' if p[0] == 'Music' else '')})
+                          'art_url': p[7].strip() or ('artwork:' + p[0] if p[0] in ('Music', 'iTunes') else '')})
         if not found:
             self.player = None
             return None
@@ -100,8 +123,8 @@ class MacMedia:
         return found[0]
 
     async def art(self, http, url):
-        if url == 'music-artwork':
-            if await osascript(MUSIC_ART % self.art_path, timeout=5) is None:
+        if url.startswith('artwork:'):   # обложку Music/iTunes отдают только файлом
+            if await osascript(MUSIC_ART % (url.split(':', 1)[1], self.art_path), timeout=5) is None:
                 return None
             try:
                 with open(self.art_path, 'rb') as f:
