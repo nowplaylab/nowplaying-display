@@ -1,4 +1,4 @@
-package com.tab3.nowplaying;
+package com.nowplaylab.nowplaying;
 
 import android.content.Context;
 import android.graphics.Canvas;

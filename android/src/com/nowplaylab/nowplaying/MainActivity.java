@@ -1,4 +1,4 @@
-package com.tab3.nowplaying;
+package com.nowplaylab.nowplaying;
 
 import android.animation.ArgbEvaluator;
 import android.animation.ValueAnimator;
@@ -234,6 +234,7 @@ public class MainActivity extends Activity {
         server = prefs.getString("server", null);
         installCrashRestart();
         new java.io.File(getFilesDir(), "update.apk").delete();   // обновление уже поставлено
+        removeOldPackage();
         buildUi();
         setContentView(root);
     }
@@ -1886,6 +1887,37 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) hideSystemBars();   // после диалогов и шторки — снова на весь экран
+    }
+
+    /** До 2.8 приложение называлось com.tab3.nowplaying — для Android это другое приложение,
+     *  и после переезда на устройстве стояли бы два. Убираем старое: с root — тихо, без root —
+     *  системным окном «Удалить?» (один раз). */
+    private void removeOldPackage() {
+        final String old = "com.tab3.nowplaying";
+        try {
+            getPackageManager().getPackageInfo(old, 0);
+        } catch (Exception notInstalled) {
+            return;
+        }
+        pool.execute(new Runnable() {
+            public void run() {
+                boolean silent = false;
+                try {
+                    Process p = Runtime.getRuntime().exec(new String[]{"su", "-c", "pm uninstall " + old});
+                    silent = p.waitFor() == 0;
+                } catch (Exception noRoot) { }
+                if (silent || prefs.getBoolean("old_pkg_asked", false)) return;
+                prefs.edit().putBoolean("old_pkg_asked", true).commit();
+                ui.post(new Runnable() {
+                    public void run() {
+                        try {
+                            startActivity(new android.content.Intent(android.content.Intent.ACTION_DELETE,
+                                    android.net.Uri.parse("package:" + old)));
+                        } catch (Exception ignored) { }
+                    }
+                });
+            }
+        });
     }
 
     /** Полосы нужны визуализатору или пятнам свечения. */

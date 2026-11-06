@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.tab3.nowplaying"
-    android:versionCode="22"
-    android:versionName="2.7">
+    package="com.nowplaylab.nowplaying"
+    android:versionCode="23"
+    android:versionName="2.8">
 
     <!-- targetSdk 34: новые Android (15+) не ставят приложения со старым targetSdk. Код по-прежнему
          собирается против API 17, всё новое — через проверку версии -->
@@ -13,6 +13,13 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- обновление приложения без root: окно установки (Android 8+) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- убрать старую версию приложения (до 2.8 у него было другое имя пакета) -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <!-- Android 11+: без этого старое приложение не видно и его нельзя найти, чтобы убрать -->
+    <queries>
+        <package android:name="com.tab3.nowplaying" />
+    </queries>
     <!-- Android TV: экрана касаний нет, но ставиться можно; на планшетах ничего не меняется -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -37,7 +44,7 @@
             </intent-filter>
         </activity>
         <provider android:name=".ApkProvider"
-            android:authorities="com.tab3.nowplaying.apk"
+            android:authorities="com.nowplaylab.nowplaying.apk"
             android:exported="false"
             android:grantUriPermissions="true" />
         <receiver android:name=".BootReceiver" android:exported="true">

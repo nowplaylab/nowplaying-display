@@ -1,4 +1,4 @@
-package com.tab3.nowplaying;
+package com.nowplaylab.nowplaying;
 
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;

@@ -1,4 +1,4 @@
-package com.tab3.nowplaying;
+package com.nowplaylab.nowplaying;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -12,7 +12,7 @@ import java.io.FileNotFoundException;
 /** Отдаёт скачанное обновление окну установки на Android 7+ (там нельзя передавать file://).
  *  Наружу виден только один файл — update.apk, и только по выданному разрешению. */
 public class ApkProvider extends ContentProvider {
-    static final String AUTHORITY = "com.tab3.nowplaying.apk";
+    static final String AUTHORITY = "com.nowplaylab.nowplaying.apk";
 
     static Uri uri() { return Uri.parse("content://" + AUTHORITY + "/update.apk"); }
 
