@@ -144,7 +144,7 @@ To build your own `NowPlayingServer.exe`, install PyInstaller (`.venv\Scripts\py
 There is no ready-made program for them yet: the server runs from source, but with one click.
 Download the source (green **Code → Download ZIP** button on the repository page) and unpack it.
 
-- **macOS.** Needs [Python 3](https://www.python.org/downloads/macos/). Open `tools/NowPlaying-mac.command` (if macOS refuses, right-click → Open). On the first run it installs what it needs, starts the server and opens the settings window. Tracks come from **Apple Music and Spotify**; macOS will ask whether Terminal may control them, allow it. Browsers and other players on a Mac are not visible.
+- **macOS** (Apple Silicon and Intel, 10.15+). Open `tools/NowPlaying-mac.command` (if macOS refuses, right-click → Open). On the first run it downloads Python into the project folder if there is no suitable one, installs what it needs, starts the server and opens the settings window. Tracks come from the system Now Playing panel: **Yandex Music, browsers, Spotify, Apple Music, VLC**, anything shown in Control Center (via [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, bundled in `pc/mac`).
 - **Linux.** Needs `python3` and `python3-venv`. Run `sh tools/nowplaying-linux.sh` from a desktop session. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
 
 On both systems the program does not update itself and cannot install the app over adb from the settings window. The glow and the visualizer work on a Mac only with an audio capture driver such as BlackHole.

@@ -13,3 +13,6 @@ release/
 
 # секрет приложения Яндекса — только в собранной программе
 pc/yandex_secret.py
+
+# Python, который tools/NowPlaying-mac.command скачивает в папку проекта
+/python/

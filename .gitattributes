@@ -1,3 +1,7 @@
 *.sh text eol=lf
 *.png binary
 *.command text eol=lf
+pc/mac/MediaRemoteAdapter.framework/MediaRemoteAdapter binary
+pc/mac/MediaRemoteAdapterTestClient binary
+*.pl text eol=lf
+*.plist text eol=lf
