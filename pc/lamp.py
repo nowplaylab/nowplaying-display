@@ -31,7 +31,17 @@ try:   # секрет лежит не в git, а в pc/yandex_secret.py — он
     from yandex_secret import SECRET as _SECRET
 except ImportError:
     _SECRET = ''
-CLIENT_SECRET = os.environ.get('NP_YA_CLIENT_SECRET', _SECRET)
+
+
+def _unhide(s):
+    """При сборке exe секрет записывается не открытым текстом, а 'x:<base64>' (см. pc/build_exe.sh)."""
+    if not s.startswith('x:'):
+        return s
+    raw = base64.b64decode(s[2:])
+    return bytes(c ^ ((0x5A + i * 29) & 0xFF) for i, c in enumerate(raw)).decode()
+
+
+CLIENT_SECRET = os.environ.get('NP_YA_CLIENT_SECRET', _unhide(_SECRET))
 OAUTH = os.environ.get('NP_YA_OAUTH', 'https://oauth.yandex.ru')
 IOT = os.environ.get('NP_YA_IOT', 'https://api.iot.yandex.net')
 
