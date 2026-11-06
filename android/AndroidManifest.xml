@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.nowplaylab.nowplaying"
-    android:versionCode="23"
-    android:versionName="2.8">
+    android:versionCode="24"
+    android:versionName="2.9">
 
     <!-- targetSdk 34: новые Android (15+) не ставят приложения со старым targetSdk. Код по-прежнему
          собирается против API 17, всё новое — через проверку версии -->
@@ -47,6 +47,17 @@
             android:authorities="com.nowplaylab.nowplaying.apk"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <!-- заставка: Настройки → Заставка → «Сейчас играет» (Android 4.2+, на планшете — во время зарядки) -->
+        <service
+            android:name=".NowPlayingDream"
+            android:label="Сейчас играет"
+            android:exported="true"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
         <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
