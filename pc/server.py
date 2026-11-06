@@ -34,6 +34,7 @@ from winrt.windows.storage.streams import Buffer, InputStreamOptions
 
 import background
 import clips
+import lamp
 import bands
 import calendar_ics
 import pcstate
@@ -48,7 +49,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '2.4'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.5'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -570,6 +571,7 @@ CALENDAR = calendar_ics.Calendar(SETTINGS)
 FRAME = photoframe.PhotoFrame(SETTINGS)
 BANDS = bands.Bands()
 PULSE = pulse.Pulse()
+LAMP = lamp.Lamp(SETTINGS)
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
 
@@ -682,6 +684,7 @@ async def on_startup(app):
     app['calendar'] = asyncio.create_task(CALENDAR.watch(app['http']))
     app['frame'] = asyncio.create_task(FRAME.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
+    app['lamp'] = asyncio.create_task(LAMP.watch(app['http'], lambda: (state['playing'], state['track_id']), art))
     loop = asyncio.get_running_loop()
     app['udp'], _ = await loop.create_datagram_endpoint(Discovery, local_addr=('0.0.0.0', UDP_PORT))
 
@@ -692,6 +695,7 @@ async def on_cleanup(app):
     app['track_bg'].cancel()
     app['weather'].cancel()
     app['update'].cancel()
+    app['lamp'].cancel()
     app['udp'].close()
     await app['http'].close()
 

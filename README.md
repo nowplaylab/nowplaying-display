@@ -23,6 +23,8 @@ Turns an old Android tablet (tested on a Samsung Galaxy Tab 3 Lite, Android 4.2)
 
 Works with any player that shows up in the Windows media overlay (the "Now Playing" panel): Yandex Music, Spotify, music in a browser and so on. VLC is supported too: it does not show up in that panel, so the server turns on VLC's built-in web interface (local only, with a random password) — restart VLC once after the first launch. Clips shorter than 45 seconds, TikTok and YouTube Shorts are ignored.
 
+**Lighting that follows the cover.** Lamps and light strips from Yandex Smart Home can change colour with the track: settings window → Lighting → Connect Yandex (you sign in with a code on Yandex's page; the program never sees your password). Any colour lamp linked to Alice works, including Xiaomi and Yeelight. White-only lamps shift their shade instead: a warm cover gives warm light, a cool one gives cool light. The colour changes once per track: Yandex controls lamps over the internet, which is too slow to follow the beat. More in [docs/lamp.md](docs/lamp.md) (in Russian).
+
 ```
 Player on the PC ──► Windows media overlay ──► server on the PC ──Wi-Fi──► app on the tablet
                                                       │

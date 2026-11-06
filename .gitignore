@@ -10,3 +10,6 @@ android/NowPlaying.apk
 *.jks
 *.idsig
 release/
+
+# секрет приложения Яндекса — только в собранной программе
+pc/yandex_secret.py

@@ -71,6 +71,7 @@ def routes(srv):
             'device_keys': list(settings.DEVICE_KEYS),
             'version': srv.VERSION,
             'vlc': srv.VLC.status,
+            'lamp': srv.LAMP.info(),
             'clock_media': media_info(srv.BG),
             'track_media': media_info(srv.TRACK_BG),
             'preparing': {'clock': bool(srv.BG.pending), 'track': bool(srv.TRACK_BG.pending)},
@@ -216,6 +217,21 @@ def routes(srv):
             return srv.jsonr({'ok': False, 'error': str(e)})
         return srv.jsonr({'ok': True})
 
+    async def lamp_action(request):
+        action, http = request.match_info['action'], request.app['http']
+        if action == 'login':
+            await srv.LAMP.start_login(http)
+        elif action == 'cancel':
+            srv.LAMP.cancel_login()
+        elif action == 'logout':
+            srv.LAMP.logout()
+            srv.SETTINGS.update({'lamp_ids': []})
+        elif action == 'refresh':
+            await srv.LAMP.refresh_lamps(http, force=True)
+        elif action == 'test':
+            srv.LAMP.test()
+        return srv.jsonr(state(device_of(request)))
+
     return [
         web.static('/settings-ui', resource('settings_ui')),
         web.get('/settings', local_only(page, page=True)),
@@ -230,4 +246,5 @@ def routes(srv):
         web.get('/api/settings/adb', local_only(adb_status)),
         web.post('/api/settings/adb/download', local_only(adb_download)),
         web.post('/api/settings/adb/install', local_only(adb_install)),
+        web.post(r'/api/settings/lamp/{action:login|cancel|logout|refresh|test}', local_only(lamp_action)),
     ]

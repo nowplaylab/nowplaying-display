@@ -59,6 +59,13 @@ DEFAULTS = {
     'alarm_music': False,          # в момент звонка включить музыку на ПК
     'resume': True,                # карточка «Продолжить» на часах, когда музыка на паузе
     'wol': True,                   # кнопка «Включить компьютер», когда ПК не отвечает
+    # подсветка: лампы Умного дома Яндекса в цвет обложки
+    'lamp_on': False,
+    'lamp_ids': [],                # какие лампы (id из Умного дома)
+    'lamp_bright': 80,             # яркость во время музыки, %: 10…100
+    'lamp_vivid': 'cover',         # calm — спокойнее, cover — как на обложке, vivid — ярче
+    'lamp_pause': 'dim',           # на паузе: keep — не менять, dim — приглушить, off — выключить
+    'lamp_idle': 'restore',        # музыка не играет 5 минут: restore — как было, warm — тёплый свет, off — выключить
     # программа
     'auto_update': True,
 }
@@ -249,6 +256,16 @@ class Settings:
             elif isinstance(d, str):
                 v = str(v)[:1000 if k in ('calendar_url', 'frame_dir') else 200]
             clean[k] = v
+        if 'lamp_ids' in changes:
+            v = changes['lamp_ids']
+            if isinstance(v, list):
+                clean['lamp_ids'] = [str(x)[:100] for x in v[:20] if isinstance(x, str) and x]
+            else:
+                clean.pop('lamp_ids', None)
+        for k, ok in (('lamp_vivid', ('calm', 'cover', 'vivid')), ('lamp_pause', ('keep', 'dim', 'off')),
+                      ('lamp_idle', ('restore', 'warm', 'off'))):
+            if k in clean and clean[k] not in ok:
+                clean.pop(k)
         if 'widget_slots' in changes:
             v = changes['widget_slots']
             if isinstance(v, list):
@@ -290,7 +307,8 @@ class Settings:
             clean.pop('theme')
         for k, lo, hi in (('track_dim', 0, 90), ('clock_dim', 0, 90), ('night_from', 0, 23),
                           ('night_to', 0, 23), ('dark_after_min', 0, 720), ('color_sat', -50, 100),
-                          ('color_contrast', -50, 50), ('color_bright', -30, 30), ('color_warm', -50, 50)):
+                          ('color_contrast', -50, 50), ('color_bright', -30, 30), ('color_warm', -50, 50),
+                          ('lamp_bright', 10, 100)):
             if k in clean:
                 clean[k] = max(lo, min(hi, clean[k]))
         return clean

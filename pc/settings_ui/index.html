@@ -177,6 +177,17 @@ a.btn { color: var(--text); text-decoration: none; }
 .msg { font-size: 12.5px; }
 .msg.ok { color: var(--ok); }
 .msg.err { color: #ff8a8a; }
+.lamp-flow { width: 100%; background: var(--card-hi); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.lamp-flow ol { margin: 0; padding-left: 20px; color: var(--dim); }
+.lamp-flow li + li { margin-top: 6px; }
+.lamp-flow li b { color: var(--text); font-weight: 600; }
+.lamp-code { font: 700 22px/1 'Inter Display', sans-serif; letter-spacing: .08em; color: var(--text); display: inline-block; margin: 6px 0 2px; user-select: all; }
+.lamp-list { width: 100%; display: grid; gap: 8px; }
+.lamp-list label { display: flex; align-items: center; gap: 12px; background: var(--card-hi); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.lamp-list input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; flex: none; }
+.lamp-list small { color: var(--dim); display: block; font-size: 12.5px; }
+.lamp-now { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 10px currentColor; }
+#lampCard.off .dep { opacity: .45; pointer-events: none; }
 .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%;
   animation: r .8s linear infinite; vertical-align: -1px; margin-right: 6px; }
 @keyframes r { to { transform: rotate(1turn); } }
@@ -230,6 +241,7 @@ a.btn { color: var(--text); text-decoration: none; }
       <a href="#alarm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M5 4 2.5 6.5M19 4l2.5 2.5"/></svg>Будильник</a>
       <a href="#weather"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 11.3 3.4 3.4 0 0 0 7 18Z"/></svg>Погода</a>
       <a href="#tablet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M19 12h.01"/></svg>Планшет</a>
+      <a href="#lamp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3Z"/></svg>Подсветка</a>
       <a href="#app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Программа</a>
     </nav>
     <div class="side-foot"><span class="dot" id="tabdot"></span><span id="tabline">планшет не на связи</span></div>
@@ -537,6 +549,43 @@ a.btn { color: var(--text); text-decoration: none; }
       </div>
     </section>
 
+    <section id="lamp">
+      <h1>Подсветка</h1>
+      <p class="lead">Лампа из Умного дома Яндекса берёт цвет обложки, когда меняется трек.</p>
+      <div class="card" id="lampCard">
+        <div class="row">
+          <div class="t"><b>Подсветка в цвет обложки</b><small id="lampSub">Лампа меняет цвет вместе с треком</small></div>
+          <label class="sw"><input type="checkbox" data-key="lamp_on"><i></i></label>
+        </div>
+        <div class="row" id="lampAcc" style="flex-wrap: wrap">
+          <div class="t"><b>Яндекс</b><small id="lampAccSub">Не подключён</small></div>
+          <div class="btns" id="lampAccBtns"></div>
+          <div class="lamp-flow" id="lampFlow" hidden></div>
+          <div class="lamp-list" id="lampList" hidden></div>
+        </div>
+        <div class="row dep">
+          <div class="t"><b>Яркость</b><small>Насколько ярко светит лампа во время музыки</small></div>
+          <div class="range"><input type="range" min="10" max="100" step="5" data-key="lamp_bright"><output></output></div>
+        </div>
+        <div class="row dep">
+          <div class="t"><b>Цвет</b><small>Насколько сочно повторять обложку</small></div>
+          <div class="seg"><button data-lvivid="calm">Спокойнее</button><button data-lvivid="cover">Как на обложке</button><button data-lvivid="vivid">Ярче</button></div>
+        </div>
+        <div class="row dep">
+          <div class="t"><b>На паузе</b></div>
+          <div class="seg"><button data-lpause="keep">Не менять</button><button data-lpause="dim">Приглушить</button><button data-lpause="off">Выключить</button></div>
+        </div>
+        <div class="row dep">
+          <div class="t"><b>Когда музыка не играет</b><small>Через 5 минут тишины</small></div>
+          <div class="seg"><button data-lidle="restore">Как было</button><button data-lidle="warm">Тёплый</button><button data-lidle="off">Выключить</button></div>
+        </div>
+        <div class="row dep">
+          <div class="t"><b>Проверка</b><small>Лампа мигнёт и вернётся к цвету обложки</small></div>
+          <button class="btn" id="lampTest">Мигнуть лампой</button>
+        </div>
+      </div>
+    </section>
+
     <section id="app">
       <h1>Программа</h1>
       <p class="lead">NowPlaying Server на этом компьютере.</p>
@@ -713,6 +762,7 @@ function render(st) {
     || 'Ссылка на календарь в формате iCal. В Google Календаре: настройки → твой календарь → «Секретный адрес в формате iCal»';
   $('#wolSub').textContent = st.wol.mac ? `Будит ${st.wol.name} (сетевая карта ${st.wol.mac}), когда он не отвечает`
     : 'Когда комп выключен, на часах появится кнопка «Включить компьютер»';
+  renderLamp(st);
   // планшет
   const t = st.tablet, online = t.seen !== null && t.seen < 15;
   $('#tabdot').classList.toggle('ok', online);
@@ -922,6 +972,65 @@ $('#main').addEventListener('scroll', () => {
   for (const sec of $$('section')) if (sec.getBoundingClientRect().top < 160) cur = sec.id;
   for (const a of links) a.classList.toggle('on', a.getAttribute('href') === '#' + cur);
 });
+
+// подсветка
+async function lampDo(action) {
+  try { render(await api('/api/settings/lamp/' + action, { method: 'POST' })); }
+  catch (e) { toast('Не получилось: ' + e.message); }
+}
+function renderLamp(st) {
+  const L = st.lamp, s = st.settings;
+  if (!L) return;
+  for (const b of $$('[data-lvivid]')) b.classList.toggle('on', b.dataset.lvivid === s.lamp_vivid);
+  for (const b of $$('[data-lpause]')) b.classList.toggle('on', b.dataset.lpause === s.lamp_pause);
+  for (const b of $$('[data-lidle]')) b.classList.toggle('on', b.dataset.lidle === s.lamp_idle);
+  $('#lampCard').classList.toggle('off', !s.lamp_on || L.status !== 'ok' || !s.lamp_ids.length);
+  const sub = $('#lampSub');
+  sub.textContent = '';
+  if (L.active && L.color) { const dot = el('i', 'lamp-now'); dot.style.background = L.color; dot.style.color = L.color; sub.append(dot, 'Сейчас светит этим цветом'); }
+  else sub.textContent = L.status === 'ok' && !s.lamp_ids.length ? 'Выбери лампу ниже' : 'Лампа меняет цвет вместе с треком';
+  const accSub = $('#lampAccSub'), btns = $('#lampAccBtns'), flow = $('#lampFlow'), list = $('#lampList');
+  const key = JSON.stringify([L.status, L.login, L.error, L.lamps.map(l => l.id), s.lamp_ids]);
+  if (btns.dataset.key === key) return;
+  btns.dataset.key = key;
+  btns.textContent = ''; flow.textContent = ''; list.textContent = '';
+  flow.hidden = list.hidden = true;
+  const btn = (text, action, primary) => { const b = el('button', 'btn' + (primary ? ' primary' : ''), text); b.addEventListener('click', () => lampDo(action)); btns.append(b); };
+  if (L.status === 'no_app') {
+    accSub.textContent = 'В этой версии программы подключение к Яндексу ещё не готово';
+  } else if (L.status === 'login') {
+    accSub.textContent = 'Жду подтверждения на странице Яндекса…';
+    btn('Отмена', 'cancel');
+    const ol = el('ol');
+    const li1 = el('li', null, 'Открой '); const a = el('a', null, L.login.url.replace(/^https?:\/\//, ''));
+    a.href = L.login.url; a.target = '_blank'; a.style.color = 'var(--accent)'; li1.append(a, ' на телефоне или компьютере');
+    const li2 = el('li', null, 'Введи код'); li2.append(el('br'), el('span', 'lamp-code', L.login.code));
+    ol.append(li1, li2, el('li', null, 'Разреши NowPlaying управлять устройствами'));
+    flow.append(ol); flow.hidden = false;
+  } else if (L.status === 'ok') {
+    accSub.textContent = L.error || (L.lamps.length ? 'Подключён. Отметь, какими лампами управлять' : 'Подключён, но ламп в Умном доме не нашлось');
+    btn('Обновить список', 'refresh'); btn('Отключить', 'logout');
+    for (const l of L.lamps) {
+      const lab = el('label'), cb = el('input');
+      cb.type = 'checkbox'; cb.checked = s.lamp_ids.includes(l.id);
+      cb.addEventListener('change', () => {
+        const ids = new Set(S.settings.lamp_ids);
+        cb.checked ? ids.add(l.id) : ids.delete(l.id);
+        save({ lamp_ids: [...ids] });
+      });
+      const t = el('span', null, l.name); t.append(el('small', null, [l.room, l.model ? 'цветная' : 'только белый свет'].filter(Boolean).join(', ')));
+      lab.append(cb, t); list.append(lab);
+    }
+    list.hidden = !L.lamps.length;
+  } else {
+    accSub.textContent = L.error || 'Не подключён. Лампы управляются через Умный дом Яндекса, пароль программа не видит';
+    btn('Подключить Яндекс', 'login', true);
+  }
+}
+for (const b of $$('[data-lvivid]')) b.addEventListener('click', () => save({ lamp_vivid: b.dataset.lvivid }));
+for (const b of $$('[data-lpause]')) b.addEventListener('click', () => save({ lamp_pause: b.dataset.lpause }));
+for (const b of $$('[data-lidle]')) b.addEventListener('click', () => save({ lamp_idle: b.dataset.lidle }));
+$('#lampTest').addEventListener('click', () => { lampDo('test'); toast('Мигаю'); });
 
 async function refresh() { try { render(await api(settingsUrl())); } catch (e) {} }
 refresh();
