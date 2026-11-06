@@ -49,7 +49,7 @@ import updater
 import volume
 import yandex
 
-VERSION = '2.5'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.6'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -628,7 +628,8 @@ async def h_bands(request):
     try:
         end = time.time() + 600
         while time.time() < end:
-            on = state['playing'] and SETTINGS.anywhere(lambda v: v['visualizer'] != 'off')
+            # полосы нужны визуализатору и пятнам свечения (без видео за треком)
+            on = state['playing'] and SETTINGS.anywhere(lambda v: v['visualizer'] != 'off' or v['pulse'])
             BANDS.want(on)
             await resp.write((BANDS.line() if on else '0 ' * 23 + '0').encode() + b'\n')
             await asyncio.sleep(1 / 30)

@@ -168,6 +168,13 @@ public class MainActivity extends Activity {
     private volatile boolean pulseOn, playerShown;   // pulseOn — только если сервер его знает (1.7+)
     private volatile float pulseLevel;
     private float glowShown;
+    // без видео за треком свечение — три пятна по экрану: басы, середина, верха (полосы с /api/bands)
+    private static final float[][] SPOT_AT = {{0.06f, 0.9f}, {0.92f, 0.16f}, {0.62f, 1.0f}};
+    private final View[] spots = new View[3];
+    private final GradientDrawable[] spotDrawables = new GradientDrawable[3];
+    private final float[] spotShown = new float[3];
+    private final float[] spotLevel = new float[3];      // пишет сетевой поток
+    private volatile long spotFreshAt;                  // когда последний раз пришли ненулевые полосы
     private boolean connected;
     private volatile boolean pcLost;   // ПК перестал отвечать (а не просто ещё не ответил после запуска)
 
@@ -453,6 +460,21 @@ public class MainActivity extends Activity {
         glow.setAlpha(0f);
         glow.setVisibility(View.GONE);
         root.addView(glow, new FrameLayout.LayoutParams(-1, -1));
+        for (int i = 0; i < 3; i++) {
+            GradientDrawable d = new GradientDrawable();
+            d.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+            d.setGradientRadius(dp(i == 2 ? 340 : 300));
+            d.setGradientCenter(SPOT_AT[i][0], SPOT_AT[i][1]);
+            d.setColors(new int[]{0x00000000, 0x00000000});
+            View v = new View(this);
+            v.setBackgroundDrawable(d);
+            v.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            v.setAlpha(0f);
+            v.setVisibility(View.GONE);
+            root.addView(v, new FrameLayout.LayoutParams(-1, -1));
+            spots[i] = v;
+            spotDrawables[i] = d;
+        }
 
         visualizer = new VisualizerView(this);   // под обложкой и текстом, поверх фона
         visualizer.setVisibility(View.GONE);
@@ -1733,6 +1755,17 @@ public class MainActivity extends Activity {
         int c = Color.HSVToColor(best);
         glowDrawable.setColors(new int[]{(c & 0x00ffffff) | 0x99000000, c & 0x00ffffff});
         visualizer.setColor(c);
+        // у каждого пятна свой цвет фона (их три), так же поднятый по яркости
+        for (int i = 0; i < 3; i++) {
+            float[] hsv = new float[3];
+            Color.colorToHSV(colors[Math.min(i, colors.length - 1)], hsv);
+            if (hsv[1] < 0.12f) hsv = best.clone();     // серый угол обложки — берём главный цвет
+            hsv[1] = Math.max(hsv[1], 0.45f);
+            hsv[2] = 0.95f;
+            int sc = Color.HSVToColor(hsv);
+            spotDrawables[i].setColors(new int[]{(sc & 0x00ffffff) | 0x88000000, sc & 0x00ffffff});
+            spots[i].invalidate();
+        }
     }
 
     /** 25 раз в секунду: прозрачность свечения по уровню звука (с лёгким сглаживанием). */
@@ -1743,7 +1776,8 @@ public class MainActivity extends Activity {
             if (vis != (visualizer.getVisibility() == View.VISIBLE)) visualizer.setVisibility(vis ? View.VISIBLE : View.GONE);
             visualizer.setRunning(vis);
             boolean on = pulseOn && playerShown && playing && dark.getVisibility() != View.VISIBLE;
-            if (on) {
+            boolean spread = on && clipLayer.getVisibility() != View.VISIBLE;   // за треком нет видео
+            if (on && !spread) {
                 float target = pulseLevel;
                 glowShown += (target - glowShown) * (target > glowShown ? 0.6f : 0.18f);
                 if (glow.getVisibility() != View.VISIBLE) glow.setVisibility(View.VISIBLE);
@@ -1751,6 +1785,21 @@ public class MainActivity extends Activity {
             } else if (glow.getVisibility() == View.VISIBLE) {
                 glowShown = 0;
                 glow.setVisibility(View.GONE);
+            }
+            // полос нет (старый сервер или звук не слышен) — пятна дышат по общему уровню, вразнобой
+            boolean bands = SystemClock.uptimeMillis() - spotFreshAt < 2500;
+            long t = SystemClock.uptimeMillis();
+            for (int i = 0; i < 3; i++) {
+                if (spread) {
+                    float target = bands ? spotLevel[i]
+                            : pulseLevel * (0.65f + 0.35f * (float) Math.sin(t / (900.0 + 370 * i) + i * 2.1));
+                    spotShown[i] += (target - spotShown[i]) * (target > spotShown[i] ? 0.55f : 0.14f);
+                    if (spots[i].getVisibility() != View.VISIBLE) spots[i].setVisibility(View.VISIBLE);
+                    spots[i].setAlpha(0.12f + 0.88f * spotShown[i]);
+                } else if (spots[i].getVisibility() == View.VISIBLE) {
+                    spotShown[i] = 0;
+                    spots[i].setVisibility(View.GONE);
+                }
             }
             ui.postDelayed(this, 40);
         }
@@ -1788,7 +1837,7 @@ public class MainActivity extends Activity {
     private void bandsLoop(int gen) {
         while (running && gen == generation) {
             String s = server;
-            if ("off".equals(visStyle) || !playerShown || !playing || s == null) {
+            if (!wantBands() || s == null) {
                 SystemClock.sleep(1000);
                 continue;
             }
@@ -1799,9 +1848,9 @@ public class MainActivity extends Activity {
                 c.setReadTimeout(5000);
                 java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(c.getInputStream()));
                 String line;
-                while (running && gen == generation && !"off".equals(visStyle) && playerShown && playing
-                        && (line = r.readLine()) != null) {
-                    visualizer.setLine(line);
+                while (running && gen == generation && wantBands() && (line = r.readLine()) != null) {
+                    if (!"off".equals(visStyle)) visualizer.setLine(line);
+                    if (pulseOn) spotLine(line);
                 }
             } catch (Exception e) {
                 SystemClock.sleep(2000);   // сервер старый (нет /api/bands) или нет связи
@@ -1810,6 +1859,32 @@ public class MainActivity extends Activity {
             }
             visualizer.clear();
         }
+    }
+
+    /** Полосы нужны визуализатору или пятнам свечения. */
+    private boolean wantBands() {
+        return (!"off".equals(visStyle) || pulseOn) && playerShown && playing;
+    }
+
+    /** 24 полосы -> уровни трёх пятен: басы (0–4), середина (5–13), верха (14–23). */
+    private void spotLine(String line) {
+        String[] p = line.trim().split(" ");
+        if (p.length < 24) return;
+        int[][] groups = {{0, 5}, {5, 14}, {14, 24}};
+        boolean any = false;
+        for (int g = 0; g < 3; g++) {
+            float sum = 0, max = 0;
+            for (int i = groups[g][0]; i < groups[g][1]; i++) {
+                float v;
+                try { v = Integer.parseInt(p[i]) / 99f; } catch (NumberFormatException e) { v = 0; }
+                sum += v;
+                max = Math.max(max, v);
+            }
+            float level = 0.5f * sum / (groups[g][1] - groups[g][0]) + 0.5f * max;
+            spotLevel[g] = Math.min(1f, level * 1.15f);
+            any |= level > 0.01f;
+        }
+        if (any) spotFreshAt = SystemClock.uptimeMillis();
     }
 
     private static int dimColor(int percent) {
