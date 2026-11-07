@@ -181,6 +181,7 @@ public class Screen extends android.view.ContextThemeWrapper {
     private int[] bgColors = {0xff202020, 0xff0e0e0e, 0xff0e0e0e};
     // свечение за обложкой, «дышит» под музыку (уровень звука ПК идёт потоком с /api/pulse)
     private View glow;
+    private View bgFill;   // фон из цветов обложки (под всем)
     private GradientDrawable glowDrawable;
     private VisualizerView visualizer;
     private volatile String visStyle = "off";   // визуализатор: off, bars, wave, dots
@@ -312,7 +313,11 @@ public class Screen extends android.view.ContextThemeWrapper {
     private void buildUi() {
         root = new FrameLayout(this);
         background = new GradientDrawable(GradientDrawable.Orientation.TL_BR, bgColors);
-        root.setBackgroundDrawable(background);
+        // фон из цветов обложки — отдельным слоем, а не фоном root: так к нему применяется поправка
+        // цвета, а root остаётся без слоя (иначе видео под ним не видно, см. applyColor)
+        bgFill = new View(this);
+        bgFill.setBackgroundDrawable(background);
+        root.addView(bgFill, new FrameLayout.LayoutParams(-1, -1));
         // жесты: тап — пауза/продолжить, свайп — следующий/предыдущий, долгое нажатие — адрес ПК
         final GestureDetector gestures = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             @Override public boolean onDown(MotionEvent e) {
@@ -2668,10 +2673,25 @@ public class Screen extends android.view.ContextThemeWrapper {
         String key = sat + "," + contrast + "," + bright + "," + warm;
         if (key.equals(colorKey)) return;
         colorKey = key;
-        if (sat == 0 && contrast == 0 && bright == 0 && warm == 0) {
-            root.setLayerType(View.LAYER_TYPE_NONE, null);
-            return;
+        Paint p = null;
+        if (sat != 0 || contrast != 0 || bright != 0 || warm != 0) {
+            p = colorPaint(sat, contrast, bright, warm);
         }
+        // Слой с фильтром — у каждой части экрана, но не у слоёв с видео: SurfaceView показывает
+        // видео через «окно» в экране, а слой с фильтром это окно закрашивает (клипы на планшете
+        // пропадали, 2.4–2.10). Картинки внутри видео-слоёв (своё фото, размытая обложка) — отдельно.
+        root.setLayerType(View.LAYER_TYPE_NONE, null);
+        for (int i = 0; i < root.getChildCount(); i++) {
+            View ch = root.getChildAt(i);
+            if (ch == clipLayer || ch == bgLayer) continue;
+            boolean alphaLayer = ch == glow || java.util.Arrays.asList(spots).contains(ch);   // им слой нужен и без фильтра
+            ch.setLayerType(p != null || alphaLayer ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
+        }
+        clipImage.setLayerType(p != null ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
+        bgImage.setLayerType(p != null ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
+    }
+
+    private static Paint colorPaint(int sat, int contrast, int bright, int warm) {
         ColorMatrix m = new ColorMatrix();
         m.setSaturation(1f + sat / 100f);
         float c = 1f + contrast / 100f, t = 127.5f * (1f - c) + bright * 2.55f;
@@ -2683,7 +2703,7 @@ public class Screen extends android.view.ContextThemeWrapper {
                 0, 0, 0, 1, 0}));
         Paint p = new Paint();
         p.setColorFilter(new ColorMatrixColorFilter(m));
-        root.setLayerType(View.LAYER_TYPE_HARDWARE, p);
+        return p;
     }
 
     private Boolean tv;

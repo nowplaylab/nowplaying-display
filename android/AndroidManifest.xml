@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.nowplaylab.nowplaying"
-    android:versionCode="24"
-    android:versionName="2.9">
+    android:versionCode="25"
+    android:versionName="2.10">
 
     <!-- targetSdk 34: новые Android (15+) не ставят приложения со старым targetSdk. Код по-прежнему
          собирается против API 17, всё новое — через проверку версии -->
