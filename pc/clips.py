@@ -4,7 +4,7 @@
 трека (backgroundVideoUri, короткая нарезка из клипа), а если его нет, но есть клип, то
 10-секундное превью клипа (тоже нарезка; весь клип без аккаунта не отдают). Видео
 перекодируется под Android 4.2: без чёрных полос, кадр 16:9 по центру, размытие,
-без звука, H.264 baseline. Если в сети есть телевизор, рядом делается вторая версия
+без звука, H.264 baseline, 854×480. Если в сети есть телевизор, рядом делается вторая версия
 для него: в исходном качестве до 1080p и без размытия ({id}-hd.mp4). Готовые файлы лежат в %LOCALAPPDATA%\\NowPlaying\\clips:
 не больше 20, а видео, которое 12 часов не показывалось, удаляется.
 """
@@ -42,12 +42,22 @@ class Clips:
         self.jobs = {}
         self.cleaned_at = 0
         os.makedirs(self.cache_dir, exist_ok=True)
+        # лёгкие версии из прошлых сборок (512×288, сильное размытие) — пересоздаём
+        marker = os.path.join(self.cache_dir, 'format-2')
+        if not os.path.exists(marker):
+            for name in os.listdir(self.cache_dir):
+                if re.fullmatch(r'[0-9a-f]{12}\.mp4', name):
+                    try:
+                        os.remove(os.path.join(self.cache_dir, name))
+                    except OSError:
+                        pass
+            open(marker, 'w').close()
         for name in os.listdir(self.cache_dir):
             if re.fullmatch(r'[0-9a-f]{12}\.mp4', name):
                 self.ready[name[:12]] = os.path.join(self.cache_dir, name)
             elif re.fullmatch(r'[0-9a-f]{12}-hd\.mp4', name):
                 self.ready_hd[name[:12]] = os.path.join(self.cache_dir, name)
-            else:  # недокачанное с прошлого запуска
+            elif not name.startswith('format-'):  # недокачанное с прошлого запуска
                 try:
                     os.remove(os.path.join(self.cache_dir, name))
                 except OSError:
@@ -205,9 +215,11 @@ class Clips:
             codec = ['-profile:v', 'high', '-level', '4.1', '-preset', 'veryfast', '-crf', '19']
         else:
             # фон: кадр 16:9 по центру, маленький и размытый — планшет растянет на весь экран
-            vf = (crop + 'scale=512:288:force_original_aspect_ratio=increase,crop=512:288,'
-                  'gblur=sigma=3,setsar=1,fps=30,format=yuv420p')
-            codec = ['-profile:v', 'baseline', '-level', '3.1', '-preset', 'veryfast', '-crf', '24']
+            # 854×480 и лёгкое размытие: на 512×288 с сильным размытием тёмные клипы под
+            # затемнением превращались в почти чёрный фон (2.10)
+            vf = (crop + 'scale=854:480:force_original_aspect_ratio=increase,crop=854:480,'
+                  'gblur=sigma=0.8,setsar=1,fps=30,format=yuv420p')
+            codec = ['-profile:v', 'baseline', '-level', '3.1', '-preset', 'veryfast', '-crf', '23']
         cmd = [ffmpeg_exe(), '-y', '-v', 'error', *start, '-i', src, '-t', '30', '-an', '-vf', vf,
                '-c:v', 'libx264', *codec, '-movflags', '+faststart', tmp]
         r = subprocess.run(cmd, capture_output=True, text=True, creationflags=NO_WINDOW, timeout=300)
