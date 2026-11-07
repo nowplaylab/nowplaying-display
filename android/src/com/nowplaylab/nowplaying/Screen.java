@@ -2677,18 +2677,20 @@ public class Screen extends android.view.ContextThemeWrapper {
         if (sat != 0 || contrast != 0 || bright != 0 || warm != 0) {
             p = colorPaint(sat, contrast, bright, warm);
         }
-        // Слой с фильтром — у каждой части экрана, но не у слоёв с видео: SurfaceView показывает
-        // видео через «окно» в экране, а слой с фильтром это окно закрашивает (клипы на планшете
-        // пропадали, 2.4–2.10). Картинки внутри видео-слоёв (своё фото, размытая обложка) — отдельно.
+        // Поправка цвета — только для картинок: обложка, пластинка, фон из цветов обложки, своё фото,
+        // пятна свечения, визуализатор. Текст и часы остаются чисто белыми (контраст и яркость
+        // заметно меняли белые буквы), а слои с видео не трогаем совсем: слой с фильтром закрашивает
+        // «окно», через которое SurfaceView показывает видео (клипы на планшете пропадали).
         root.setLayerType(View.LAYER_TYPE_NONE, null);
-        for (int i = 0; i < root.getChildCount(); i++) {
-            View ch = root.getChildAt(i);
-            if (ch == clipLayer || ch == bgLayer) continue;
-            boolean alphaLayer = ch == glow || java.util.Arrays.asList(spots).contains(ch);   // им слой нужен и без фильтра
-            ch.setLayerType(p != null || alphaLayer ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
+        int type = p != null ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE;
+        for (View v : new View[]{bgFill, cover, vinyl, clipImage, bgImage, visualizer}) {
+            if (v != null) v.setLayerType(type, p);
         }
-        clipImage.setLayerType(p != null ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
-        bgImage.setLayerType(p != null ? View.LAYER_TYPE_HARDWARE : View.LAYER_TYPE_NONE, p);
+        // свечению слой нужен и без фильтра — им дёшево менять прозрачность
+        glow.setLayerType(View.LAYER_TYPE_HARDWARE, p);
+        for (View v : spots) {
+            if (v != null) v.setLayerType(View.LAYER_TYPE_HARDWARE, p);
+        }
     }
 
     private static Paint colorPaint(int sat, int contrast, int bright, int warm) {
