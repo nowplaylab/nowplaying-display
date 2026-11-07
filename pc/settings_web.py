@@ -240,8 +240,10 @@ def routes(srv):
 
     async def strip_search(request):
         devs = await srv.STRIP.search()
-        if devs and not srv.SETTINGS['strip_id']:
-            srv.SETTINGS.update({'strip_id': devs[0]['id']})
+        sid = srv.SETTINGS['strip_id']
+        # ничего не выбрано или выбранной ленты больше нет (сброс, замена) — берём единственную найденную
+        if devs and (not sid or (len(devs) == 1 and not any(d['id'] == sid for d in devs))):
+            srv.SETTINGS.update({'strip_id': devs[0]['id'], 'strip_addr': ''})
         return srv.jsonr(state(device_of(request)))
 
     return [

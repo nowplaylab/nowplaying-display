@@ -1053,7 +1053,7 @@ function renderStrip(st) {
   for (const b of $$('[data-smode]')) b.classList.toggle('on', b.dataset.smode === s.strip_mode);
   $('#stripDelayRow').hidden = s.strip_mode !== 'beat';
   const dev = R.devices.find(d => d.id === s.strip_id);
-  $('#stripDev').textContent = dev ? `${dev.name || 'Yeelight'} · ${dev.model} · ${dev.ip}` : (R.error || (s.strip_id ? 'Ищу в сети…' : 'Не выбрана'));
+  $('#stripDev').textContent = dev ? `${dev.name || 'Yeelight'} · ${dev.model} · ${dev.ip}` : (R.error || (s.strip_id && R.devices.length ? 'Выбранной ленты нет в сети — выбери из найденных' : s.strip_id ? 'Ищу в сети…' : 'Не выбрана'));
   const sub = $('#stripSub'); sub.textContent = '';
   if (R.active && R.color) { const dot = el('i', 'lamp-now'); dot.style.background = R.color; dot.style.color = R.color; sub.append(dot, R.music ? 'Светит в такт' : 'Сейчас светит этим цветом'); }
   else sub.textContent = 'Напрямую, без Яндекса и интернета. В приложении Yeelight включи «Управление по локальной сети»';
@@ -1068,7 +1068,7 @@ function renderStrip(st) {
     const t = el('span', null, d.name || 'Yeelight'); t.append(el('small', null, [d.model, d.ip, d.color ? 'цветная' : 'только белый'].join(', ')));
     lab.append(rb, t); list.append(lab);
   }
-  list.hidden = R.devices.length < 2;
+  list.hidden = !R.devices.length || (R.devices.length < 2 && !!dev);
 }
 $('#stripSearch').addEventListener('click', async () => {
   $('#stripDev').textContent = 'Ищу в сети…';
