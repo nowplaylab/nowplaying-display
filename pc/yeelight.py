@@ -59,7 +59,18 @@ class Strip:
         return None
 
     async def search(self):
-        self.devices = await asyncio.get_running_loop().run_in_executor(None, discover)
+        found = await asyncio.get_running_loop().run_in_executor(None, discover)
+        sid, addr = self.settings['strip_id'], self.settings['strip_addr']
+        if sid and addr and not any(d['id'] == sid for d in found):
+            # поиск не дошёл (VPN, роутер режет «общий крик» по сети) — стучимся по запомненному адресу
+            ip, _, port = addr.partition(':')
+            try:
+                props = await Bulb(ip, int(port or 55443), timeout=1.5).get_props('name')
+                found.append({'id': sid, 'name': props.get('name') or '', 'model': '', 'ip': ip,
+                              'port': int(port or 55443), 'color': True, 'music': True})
+            except (YeelightError, ValueError):
+                pass
+        self.devices = found
         self.searched_at = time.time()
         self.error = '' if self.devices else 'Лента не нашлась. Проверь, что в приложении Yeelight включено «Управление по локальной сети»'
         return self.devices
@@ -190,6 +201,9 @@ class Strip:
         d = self.device()
         if d and (d['id'], d['ip']) != getattr(self, '_dev_key', None):   # другая лента или новый адрес
             self._dev_key = (d['id'], d['ip'])
+            addr = f"{d['ip']}:{d['port']}"
+            if self.settings['strip_addr'] != addr:     # запомним, чтобы находить и без поиска
+                self.settings.update({'strip_addr': addr})
             await self._music_stop()
             self.sent = None
         playing, tid = now_state()
