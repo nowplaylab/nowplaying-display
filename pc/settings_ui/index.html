@@ -584,6 +584,21 @@ a.btn { color: var(--text); text-decoration: none; }
           <button class="btn" id="lampTest">Мигнуть лампой</button>
         </div>
       </div>
+      <div class="card" id="stripCard" style="margin-top: 14px">
+        <div class="row">
+          <div class="t"><b>Лента Yeelight по сети</b><small id="stripSub">Напрямую, без Яндекса и интернета. В приложении Yeelight включи «Управление по локальной сети»</small></div>
+          <label class="sw"><input type="checkbox" data-key="strip_on"><i></i></label>
+        </div>
+        <div class="row" style="flex-wrap: wrap">
+          <div class="t"><b>Лента</b><small id="stripDev">Не выбрана</small></div>
+          <button class="btn" id="stripSearch">Найти ленту</button>
+          <div class="lamp-list" id="stripList" hidden></div>
+        </div>
+        <div class="row">
+          <div class="t"><b>Режим</b><small>«В такт» — яркость следует за басами (музыкальный режим ленты)</small></div>
+          <div class="seg"><button data-smode="cover">Цвет обложки</button><button data-smode="beat">В такт</button></div>
+        </div>
+      </div>
     </section>
 
     <section id="app">
@@ -763,6 +778,7 @@ function render(st) {
   $('#wolSub').textContent = st.wol.mac ? `Будит ${st.wol.name} (сетевая карта ${st.wol.mac}), когда он не отвечает`
     : 'Когда комп выключен, на часах появится кнопка «Включить компьютер»';
   renderLamp(st);
+  renderStrip(st);
   // планшет
   const t = st.tablet, online = t.seen !== null && t.seen < 15;
   $('#tabdot').classList.toggle('ok', online);
@@ -1027,6 +1043,33 @@ function renderLamp(st) {
     btn('Подключить Яндекс', 'login', true);
   }
 }
+function renderStrip(st) {
+  const R = st.strip, s = st.settings;
+  if (!R) return;
+  for (const b of $$('[data-smode]')) b.classList.toggle('on', b.dataset.smode === s.strip_mode);
+  const dev = R.devices.find(d => d.id === s.strip_id);
+  $('#stripDev').textContent = dev ? `${dev.name || 'Yeelight'} · ${dev.model} · ${dev.ip}` : (R.error || (s.strip_id ? 'Ищу в сети…' : 'Не выбрана'));
+  const sub = $('#stripSub'); sub.textContent = '';
+  if (R.active && R.color) { const dot = el('i', 'lamp-now'); dot.style.background = R.color; dot.style.color = R.color; sub.append(dot, R.music ? 'Светит в такт' : 'Сейчас светит этим цветом'); }
+  else sub.textContent = 'Напрямую, без Яндекса и интернета. В приложении Yeelight включи «Управление по локальной сети»';
+  const list = $('#stripList');
+  const key = JSON.stringify([R.devices.map(d => d.id), s.strip_id]);
+  if (list.dataset.key === key) return;
+  list.dataset.key = key; list.textContent = '';
+  for (const d of R.devices) {
+    const lab = el('label'), rb = el('input');
+    rb.type = 'radio'; rb.name = 'stripdev'; rb.checked = d.id === s.strip_id;
+    rb.addEventListener('change', () => save({ strip_id: d.id }));
+    const t = el('span', null, d.name || 'Yeelight'); t.append(el('small', null, [d.model, d.ip, d.color ? 'цветная' : 'только белый'].join(', ')));
+    lab.append(rb, t); list.append(lab);
+  }
+  list.hidden = R.devices.length < 2;
+}
+$('#stripSearch').addEventListener('click', async () => {
+  $('#stripDev').textContent = 'Ищу в сети…';
+  try { render(await api('/api/settings/strip/search', { method: 'POST' })); } catch (e) { toast('Не получилось: ' + e.message); }
+});
+for (const b of $$('[data-smode]')) b.addEventListener('click', () => save({ strip_mode: b.dataset.smode }));
 for (const b of $$('[data-lvivid]')) b.addEventListener('click', () => save({ lamp_vivid: b.dataset.lvivid }));
 for (const b of $$('[data-lpause]')) b.addEventListener('click', () => save({ lamp_pause: b.dataset.lpause }));
 for (const b of $$('[data-lidle]')) b.addEventListener('click', () => save({ lamp_idle: b.dataset.lidle }));

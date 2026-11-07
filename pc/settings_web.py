@@ -72,6 +72,7 @@ def routes(srv):
             'version': srv.VERSION,
             'vlc': srv.VLC.status,
             'lamp': srv.LAMP.info(),
+            'strip': srv.STRIP.info(),
             'clock_media': media_info(srv.BG),
             'track_media': media_info(srv.TRACK_BG),
             'preparing': {'clock': bool(srv.BG.pending), 'track': bool(srv.TRACK_BG.pending)},
@@ -237,6 +238,12 @@ def routes(srv):
             srv.LAMP.test()
         return srv.jsonr(state(device_of(request)))
 
+    async def strip_search(request):
+        devs = await srv.STRIP.search()
+        if devs and not srv.SETTINGS['strip_id']:
+            srv.SETTINGS.update({'strip_id': devs[0]['id']})
+        return srv.jsonr(state(device_of(request)))
+
     return [
         web.static('/settings-ui', resource('settings_ui')),
         web.get('/settings', local_only(page, page=True)),
@@ -252,4 +259,5 @@ def routes(srv):
         web.post('/api/settings/adb/download', local_only(adb_download)),
         web.post('/api/settings/adb/install', local_only(adb_install)),
         web.post(r'/api/settings/lamp/{action:login|cancel|logout|refresh|test}', local_only(lamp_action)),
+        web.post('/api/settings/strip/search', local_only(strip_search)),
     ]

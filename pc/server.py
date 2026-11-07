@@ -38,6 +38,7 @@ else:                         # Linux — MPRIS, macOS — Apple Music и Spotif
 import background
 import clips
 import lamp
+import yeelight
 import bands
 import calendar_ics
 import pcstate
@@ -607,6 +608,8 @@ FRAME = photoframe.PhotoFrame(SETTINGS)
 BANDS = bands.Bands()
 PULSE = pulse.Pulse()
 LAMP = lamp.Lamp(SETTINGS)
+STRIP = yeelight.Strip(SETTINGS)
+STRIP_PULSE = {'on': False}   # ленте «в такт» нужен уровень звука
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
 
@@ -650,7 +653,7 @@ async def h_pulse(request):
     finally:
         PULSE.clients -= 1
         if PULSE.clients <= 0:
-            PULSE.want(False)
+            PULSE.want(STRIP_PULSE['on'])   # лента «в такт» ещё слушает
     return resp
 
 
@@ -721,6 +724,13 @@ async def on_startup(app):
     app['frame'] = asyncio.create_task(FRAME.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
     app['lamp'] = asyncio.create_task(LAMP.watch(app['http'], lambda: (state['playing'], state['track_id']), art))
+    STRIP.level_fn = lambda: PULSE.level
+
+    def strip_wants_pulse(on):
+        STRIP_PULSE['on'] = on
+        if on or PULSE.clients <= 0:
+            PULSE.want(on or PULSE.clients > 0)
+    app['strip'] = asyncio.create_task(STRIP.watch(lambda: (state['playing'], state['track_id']), art, strip_wants_pulse))
     loop = asyncio.get_running_loop()
     app['udp'], _ = await loop.create_datagram_endpoint(Discovery, local_addr=('0.0.0.0', UDP_PORT))
 
@@ -732,6 +742,7 @@ async def on_cleanup(app):
     app['weather'].cancel()
     app['update'].cancel()
     app['lamp'].cancel()
+    app['strip'].cancel()
     app['udp'].close()
     await app['http'].close()
 

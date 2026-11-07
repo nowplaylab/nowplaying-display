@@ -66,6 +66,10 @@ DEFAULTS = {
     'lamp_vivid': 'cover',         # calm — спокойнее, cover — как на обложке, vivid — ярче
     'lamp_pause': 'dim',           # на паузе: keep — не менять, dim — приглушить, off — выключить
     'lamp_idle': 'restore',        # музыка не играет 5 минут: restore — как было, warm — тёплый свет, off — выключить
+    # лента или лампа Yeelight напрямую по сети (яркость, пауза и тишина — общие с подсветкой выше)
+    'strip_on': False,
+    'strip_id': '',
+    'strip_mode': 'cover',         # cover — цвет обложки, beat — в такт (музыкальный режим)
     # программа
     'auto_update': True,
 }
@@ -270,6 +274,8 @@ class Settings:
                 clean['lamp_ids'] = [str(x)[:100] for x in v[:20] if isinstance(x, str) and x]
             else:
                 clean.pop('lamp_ids', None)
+        if clean.get('strip_mode', 'cover') not in ('cover', 'beat'):
+            clean.pop('strip_mode')
         for k, ok in (('lamp_vivid', ('calm', 'cover', 'vivid')), ('lamp_pause', ('keep', 'dim', 'off')),
                       ('lamp_idle', ('restore', 'warm', 'off'))):
             if k in clean and clean[k] not in ok:
