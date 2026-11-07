@@ -609,7 +609,7 @@ BANDS = bands.Bands()
 PULSE = pulse.Pulse()
 LAMP = lamp.Lamp(SETTINGS)
 STRIP = yeelight.Strip(SETTINGS)
-STRIP_PULSE = {'on': False}   # ленте «в такт» нужен уровень звука
+STRIP_BASS = {'on': False}   # ленте «в такт» нужны полосы частот (басы)
 LAST_CLIENT = {}   # последний планшет, который спрашивал /api/now: ip, время, версия приложения
 
 
@@ -653,7 +653,7 @@ async def h_pulse(request):
     finally:
         PULSE.clients -= 1
         if PULSE.clients <= 0:
-            PULSE.want(STRIP_PULSE['on'])   # лента «в такт» ещё слушает
+            PULSE.want(False)
     return resp
 
 
@@ -676,7 +676,7 @@ async def h_bands(request):
     finally:
         BANDS.clients -= 1
         if BANDS.clients <= 0:
-            BANDS.want(False)
+            BANDS.want(STRIP_BASS['on'])   # лента «в такт» ещё слушает басы
     return resp
 
 
@@ -724,13 +724,13 @@ async def on_startup(app):
     app['frame'] = asyncio.create_task(FRAME.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
     app['lamp'] = asyncio.create_task(LAMP.watch(app['http'], lambda: (state['playing'], state['track_id']), art))
-    STRIP.level_fn = lambda: PULSE.level
+    STRIP.level_fn = lambda: STRIP.bass(BANDS.values)   # «в такт» — только басы, 40–140 Гц
 
-    def strip_wants_pulse(on):
-        STRIP_PULSE['on'] = on
-        if on or PULSE.clients <= 0:
-            PULSE.want(on or PULSE.clients > 0)
-    app['strip'] = asyncio.create_task(STRIP.watch(lambda: (state['playing'], state['track_id']), art, strip_wants_pulse))
+    def strip_wants_bands(on):
+        STRIP_BASS['on'] = on
+        if on or BANDS.clients <= 0:
+            BANDS.want(on or BANDS.clients > 0)
+    app['strip'] = asyncio.create_task(STRIP.watch(lambda: (state['playing'], state['track_id']), art, strip_wants_bands))
     loop = asyncio.get_running_loop()
     app['udp'], _ = await loop.create_datagram_endpoint(Discovery, local_addr=('0.0.0.0', UDP_PORT))
 

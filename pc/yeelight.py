@@ -182,6 +182,21 @@ class Strip:
             self._music = None
             return False
 
+    # ---------- басы ----------
+
+    BASS = range(0, 5)   # полосы 0–4 из bands.py: примерно 40–140 Гц — бочка и бас
+
+    def bass(self, values):
+        """Уровень басов 0..1 для «в такт»: нижние полосы, удар выделяем относительно
+        их среднего за последние полсекунды — так лента вспыхивает на бочке, а не горит ровно."""
+        if not values:
+            return 0.0
+        low = [values[i] for i in self.BASS if i < len(values)]
+        now = 0.6 * max(low) + 0.4 * sum(low) / len(low)
+        avg = getattr(self, '_bass_avg', now)
+        self._bass_avg = avg * 0.85 + now * 0.15
+        return max(0.0, min(1.0, 0.35 * now + 1.4 * max(0.0, now - avg)))
+
     # ---------- что светить ----------
 
     def info(self):
