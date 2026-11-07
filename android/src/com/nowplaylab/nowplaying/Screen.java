@@ -1910,7 +1910,7 @@ public class Screen extends android.view.ContextThemeWrapper {
         if (hasFocus && !dream) hideSystemBars();   // после диалогов и шторки — снова на весь экран
     }
 
-    /** До 2.8 приложение называлось com.tab3.nowplaying — для Android это другое приложение,
+    /** До 2.4 приложение называлось com.tab3.nowplaying — для Android это другое приложение,
      *  и после переезда на устройстве стояли бы два. Убираем старое: с root — тихо, без root —
      *  системным окном «Удалить?» (один раз). */
     private void removeOldPackage() {

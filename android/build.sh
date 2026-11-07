@@ -8,7 +8,7 @@ BT="$SDK/build-tools/34.0.0"
 JAR="$SDK/platforms/android-17/android.jar"
 # ресурсы и манифест связываем с android-21: там есть android:banner для Android TV
 # (старые Android этот атрибут просто не замечают); код по-прежнему проверяется по API 17
-# с 2.7 — android-34: атрибуты для новых Android (usesCleartextTraffic, exported)
+# с 2.4 — android-34: атрибуты для новых Android (usesCleartextTraffic, exported)
 RJAR="$SDK/platforms/android-34/android.jar"
 [ -f "$RJAR" ] || RJAR="$SDK/platforms/android-21/android.jar"
 [ -f "$RJAR" ] || RJAR="$JAR"

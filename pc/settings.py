@@ -144,7 +144,7 @@ class Settings:
             new = d is None
             if new:
                 d = self.devices[dev] = {'name': '', 'over': {}}
-                # в 2.8 приложение сменило имя пакета, и Android считает его новым: номер устройства
+                # в 2.4 приложение сменило имя пакета, и Android считает его новым: номер устройства
                 # другой. То же устройство узнаём по модели и адресу и переносим его настройки и имя
                 same = [v for k, v in self.devices.items()
                         if k != dev and v.get('model') == model[:60] and v.get('ip') == ip and v.get('over')]

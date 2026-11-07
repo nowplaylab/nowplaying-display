@@ -16,7 +16,7 @@ import aiohttp
 NO_WINDOW = 0x08000000 if sys.platform == 'win32' else 0
 TOOLS_URL = 'https://dl.google.com/android/repository/platform-tools-latest-windows.zip'
 PACKAGE = 'com.nowplaylab.nowplaying'
-OLD_PACKAGE = 'com.tab3.nowplaying'   # имя приложения до 2.8 — после установки нового убираем
+OLD_PACKAGE = 'com.tab3.nowplaying'   # имя приложения до 2.4 — после установки нового убираем
 
 
 def _dir():
@@ -76,7 +76,7 @@ def install(serial, apk):
     code, out = run('-s', serial, 'install', '-r', apk, timeout=180)
     if code != 0 or 'Success' not in out:
         raise RuntimeError(out[-300:] or 'не удалось поставить')
-    # до 2.8 приложение называлось иначе — Android считает его другим, убираем, чтобы не было двух
+    # до 2.4 приложение называлось иначе — Android считает его другим, убираем, чтобы не было двух
     run('-s', serial, 'uninstall', OLD_PACKAGE, timeout=60)
     run('-s', serial, 'shell', 'am', 'start', '-n', f'{PACKAGE}/.MainActivity', timeout=20)
     return out
