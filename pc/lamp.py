@@ -20,8 +20,9 @@ import sys
 import time
 import uuid
 
-import aiohttp
+import yandex_smarthome
 from PIL import Image
+from yandex_smarthome import AuthError, DeviceLogin, Light, LoginError, SmartHome, YandexError, light_actions
 
 log = logging.getLogger('nowplaying')
 
@@ -42,8 +43,8 @@ def _unhide(s):
 
 
 CLIENT_SECRET = os.environ.get('NP_YA_CLIENT_SECRET', _unhide(_SECRET))
-OAUTH = os.environ.get('NP_YA_OAUTH', 'https://oauth.yandex.ru')
-IOT = os.environ.get('NP_YA_IOT', 'https://api.iot.yandex.net')
+OAUTH = os.environ.get('NP_YA_OAUTH', yandex_smarthome.OAUTH)
+IOT = os.environ.get('NP_YA_IOT', yandex_smarthome.IOT)
 
 IDLE_AFTER = 300        # секунд без музыки до «музыка не играет»
 MIN_GAP = 1.0           # не чаще одной команды в секунду
@@ -180,36 +181,27 @@ class Lamp:
                 'lamps': self.lamps, 'color': hex_of(self.sent[0]) if self.sent and self.sent[0][0] != 'off' else None,
                 'active': bool(s['lamp_on'] and self.connected and s['lamp_ids'])}
 
-    # ---------- вход по коду ----------
+    # ---------- вход по коду (библиотека yandex-smarthome) ----------
 
-    def _client_auth(self):
-        d = {'client_id': CLIENT_ID}
-        if CLIENT_SECRET:
-            d['client_secret'] = CLIENT_SECRET
-        return d
+    def _auth(self):
+        return DeviceLogin(CLIENT_ID, CLIENT_SECRET, oauth=OAUTH)
 
     async def start_login(self, http):
         if not CLIENT_ID:
             self.error = 'В этой версии программы ещё нет ключа приложения для Яндекса'
             return
         self.error = ''
-        body = {'client_id': CLIENT_ID, 'device_id': self.device_id(),
-                'device_name': f'NowPlaying ({socket.gethostname()})'[:100]}
+        login = self._auth()
         try:
-            async with http.post(OAUTH + '/device/code', data=body) as r:
-                d = await r.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
-            self.error = 'Яндекс не отвечает, проверь интернет'
+            code = await login.start(http, self.device_id(), f'NowPlaying ({socket.gethostname()})')
+        except YandexError as e:
+            self.error = 'Яндекс не дал код для входа, проверь интернет'
             log.warning('lamp: device/code: %s', e)
             return
-        if 'device_code' not in d:
-            self.error = 'Яндекс не дал код для входа: ' + str(d.get('error_description') or d.get('error') or d)
-            return
-        self.login = {'user_code': d['user_code'], 'url': d.get('verification_url') or 'https://oauth.yandex.ru/device',
-                      'until': time.time() + int(d.get('expires_in') or 300)}
+        self.login = {'user_code': code.user_code, 'url': code.url, 'until': code.expires_at}
         if self._login_task:
             self._login_task.cancel()
-        self._login_task = asyncio.create_task(self._wait_login(http, d['device_code'], int(d.get('interval') or 5)))
+        self._login_task = asyncio.create_task(self._wait_login(http, login, code))
 
     def cancel_login(self):
         if self._login_task:
@@ -217,42 +209,31 @@ class Lamp:
         self._login_task = None
         self.login = None
 
-    async def _wait_login(self, http, code, interval):
+    async def _wait_login(self, http, login, code):
         try:
-            while self.login and time.time() < self.login['until']:
-                await asyncio.sleep(max(interval, 2))
+            while self.login and time.time() < code.expires_at:
+                await asyncio.sleep(max(code.interval, 2))
                 try:
-                    async with http.post(OAUTH + '/token', data={'grant_type': 'device_code', 'code': code,
-                                                                **self._client_auth()}) as r:
-                        d = await r.json(content_type=None)
-                except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
-                    continue
-                if d.get('access_token'):
-                    self._take_token(d)
+                    token = await login.poll(http, code)
+                except LoginError as e:
+                    self.error = {'expired': 'Код устарел, попробуй ещё раз',
+                                  'denied': 'Доступ не разрешили'}.get(e.reason, f'Не получилось войти: {e}')
+                    break
+                if token:
+                    self._take_token(token)
                     self.login = None
                     self.error = ''
                     log.info('lamp: connected to Yandex smart home')
                     await self.refresh_lamps(http, force=True)
                     return
-                err = d.get('error')
-                if err == 'authorization_pending':
-                    continue
-                if err == 'slow_down':
-                    interval += 2
-                    continue
-                self.error = {'invalid_grant': 'Код устарел, попробуй ещё раз',
-                              'access_denied': 'Доступ не разрешили'}.get(err, 'Не получилось войти: ' + str(
-                                  d.get('error_description') or err))
-                break
             else:
                 if self.login:
                     self.error = 'Время на ввод кода вышло, попробуй ещё раз'
         finally:
             self.login = None
 
-    def _take_token(self, d):
-        self.token.update(access=d['access_token'], refresh=d.get('refresh_token') or self.token.get('refresh'),
-                          expires_at=time.time() + int(d.get('expires_in') or 0))
+    def _take_token(self, t):
+        self.token.update(access=t.access, refresh=t.refresh or self.token.get('refresh'), expires_at=t.expires_at)
         self._save()
 
     def logout(self):
@@ -270,133 +251,73 @@ class Lamp:
     async def _refresh_token(self, http):
         if not self.token.get('refresh'):
             return False
-        try:
-            async with http.post(OAUTH + '/token', data={'grant_type': 'refresh_token',
-                                                        'refresh_token': self.token['refresh'],
-                                                        **self._client_auth()}) as r:
-                d = await r.json(content_type=None)
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError):
-            return False
-        if d.get('access_token'):
-            self._take_token(d)
-            return True
-        return False
+        t = await self._auth().refresh(http, self.token['refresh'])
+        if t:
+            self._take_token(t)
+        return bool(t)
 
     # ---------- API Умного дома ----------
 
-    async def _api(self, http, method, path, body=None, retry=True):
+    async def _home(self, http, call, retry=True):
+        """call(SmartHome) -> корутина. Обновляет токен, ошибки кладёт в self.error.
+        Возвращает (True, результат) или (False, None)."""
         if not self.connected:
-            return None
-        # токен живёт долго; обновляем, когда до конца меньше месяца
-        exp = self.token.get('expires_at') or 0
+            return False, None
+        exp = self.token.get('expires_at') or 0    # токен живёт долго; обновляем, когда до конца меньше месяца
         if exp and exp - time.time() < 30 * 86400 and retry:
             await self._refresh_token(http)
-        headers = {'Authorization': 'Bearer ' + self.token['access']}
         try:
-            async with http.request(method, IOT + path, json=body, headers=headers,
-                                    timeout=aiohttp.ClientTimeout(total=8)) as r:
-                if r.status == 401 and retry:
-                    if await self._refresh_token(http):
-                        return await self._api(http, method, path, body, retry=False)
-                    self.error = 'Вход в Яндекс больше не действует, подключи заново'
-                    self.token.pop('access', None)
-                    self._save()
-                    return None
-                d = await r.json(content_type=None)
-                if r.status != 200 or d.get('status') != 'ok':
-                    self.error = 'Умный дом ответил ошибкой: ' + str(d.get('message') or r.status)
-                    log.warning('lamp: %s %s -> %s %s', method, path, r.status, d)
-                    return None
-                return d
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
-            self.error = 'Умный дом Яндекса не отвечает'
-            log.debug('lamp: %s %s: %s', method, path, e)
-            return None
+            return True, await call(SmartHome(self.token['access'], iot=IOT))
+        except AuthError:
+            if retry and await self._refresh_token(http):
+                return await self._home(http, call, retry=False)
+            self.error = 'Вход в Яндекс больше не действует, подключи заново'
+            self.token.pop('access', None)
+            self._save()
+        except YandexError as e:
+            self.error = 'Умный дом Яндекса не отвечает или ответил ошибкой'
+            log.warning('lamp: %s', e)
+        return False, None
 
     async def refresh_lamps(self, http, force=False):
         if not force and time.time() - self.lamps_at < 600:
             return self.lamps
-        d = await self._api(http, 'GET', '/v1.0/user/info')
-        if d is None:
+        ok, lights = await self._home(http, lambda home: home.lights(http))
+        if not ok:
             return self.lamps
-        rooms = {r['id']: r.get('name', '') for r in d.get('rooms', [])}
-        out = []
-        for dev in d.get('devices', []):
-            if not str(dev.get('type', '')).startswith('devices.types.light'):
-                continue
-            item = {'id': dev['id'], 'name': dev.get('name') or 'Лампа', 'room': rooms.get(dev.get('room'), ''),
-                    'model': None, 'tmin': None, 'tmax': None, 'bright': False}
-            for c in dev.get('capabilities', []):
-                p = c.get('parameters') or {}
-                if c.get('type') == 'devices.capabilities.color_setting':
-                    item['model'] = p.get('color_model')
-                    if p.get('temperature_k'):
-                        item['tmin'] = p['temperature_k'].get('min', 2000)
-                        item['tmax'] = p['temperature_k'].get('max', 9000)
-                elif c.get('type') == 'devices.capabilities.range' and p.get('instance') == 'brightness':
-                    item['bright'] = True
-            out.append(item)
-        self.lamps = out
+        self.lamps = [{'id': l.id, 'name': l.name, 'room': l.room, 'model': l.model, 'tmin': l.tmin,
+                       'tmax': l.tmax, 'bright': l.brightness} for l in lights]
         self.lamps_at = time.time()
         self.error = ''
-        return out
+        return self.lamps
 
     async def _snapshot(self, http, ids):
         """Как лампы светят сейчас — чтобы вернуть, когда музыка закончится."""
-        d = await self._api(http, 'GET', '/v1.0/user/info')
-        if d is None:
-            return None
-        snap = {}
-        for dev in d.get('devices', []):
-            if dev['id'] not in ids:
-                continue
-            acts = []
-            for c in dev.get('capabilities', []):
-                st = c.get('state')
-                if st and c.get('type') in ('devices.capabilities.color_setting', 'devices.capabilities.range',
-                                            'devices.capabilities.on_off'):
-                    if c['type'] == 'devices.capabilities.range' and st.get('instance') != 'brightness':
-                        continue
-                    acts.append({'type': c['type'], 'state': {'instance': st['instance'], 'value': st['value']}})
-            # включить/выключить — последним, иначе выключенная лампа включится от смены цвета
-            acts.sort(key=lambda a: a['type'] == 'devices.capabilities.on_off')
-            snap[dev['id']] = acts
-        return snap
+        ok, lights = await self._home(http, lambda home: home.lights(http))
+        return {l.id: l.state for l in lights if l.id in ids} if ok else None
 
     def _actions(self, lamp, target, bright):
         """target: ('color', h, s) | ('white', K) | ('off',)."""
+        light = Light(lamp['id'], lamp.get('name', ''), model=lamp.get('model'), tmin=lamp.get('tmin'),
+                      tmax=lamp.get('tmax'), brightness=lamp.get('bright', False))
         if target[0] == 'off':
-            return [{'type': 'devices.capabilities.on_off', 'state': {'instance': 'on', 'value': False}}]
-        acts = [{'type': 'devices.capabilities.on_off', 'state': {'instance': 'on', 'value': True}}]
-        if target[0] == 'color' and lamp.get('model') == 'hsv':
-            acts.append({'type': 'devices.capabilities.color_setting',
-                         'state': {'instance': 'hsv', 'value': {'h': int(target[1]), 's': round(target[2] * 100), 'v': 100}}})
-        elif target[0] == 'color' and lamp.get('model') == 'rgb':
-            r, g, b = colorsys.hsv_to_rgb(target[1] / 360, target[2], 1)
-            acts.append({'type': 'devices.capabilities.color_setting',
-                         'state': {'instance': 'rgb', 'value': (round(r * 255) << 16) | (round(g * 255) << 8) | round(b * 255)}})
-        else:
-            # лампа без цвета (только белый): тёплая обложка — тёплый свет, холодная — холодный
-            k = target[1] if target[0] == 'white' else kelvin_for(target[1], target[2])
-            if lamp.get('tmin'):
-                k = max(lamp['tmin'], min(lamp['tmax'], k))
-                acts.append({'type': 'devices.capabilities.color_setting', 'state': {'instance': 'temperature_k', 'value': k}})
-        if lamp.get('bright'):
-            acts.append({'type': 'devices.capabilities.range',
-                         'state': {'instance': 'brightness', 'value': max(1, min(100, int(bright)))}})
-        return acts
+            return light_actions(light, on=False)
+        if target[0] == 'color' and light.color:
+            return light_actions(light, hsv=(target[1], target[2]), brightness=bright)
+        # лампа без цвета (только белый): тёплая обложка — тёплый свет, холодная — холодный
+        k = target[1] if target[0] == 'white' else kelvin_for(target[1], target[2])
+        return light_actions(light, kelvin=k, brightness=bright)
 
     async def _send(self, http, lamps, target, bright):
-        body = {'devices': [{'id': l['id'], 'actions': self._actions(l, target, bright)} for l in lamps]}
-        d = await self._api(http, 'POST', '/v1.0/devices/actions', body)
-        return d is not None
+        acts = {l['id']: self._actions(l, target, bright) for l in lamps}
+        ok, _ = await self._home(http, lambda home: home.actions(http, acts))
+        return ok
 
     async def _restore(self, http):
         if not self.saved:
             return
-        body = {'devices': [{'id': k, 'actions': v} for k, v in self.saved.items() if v]}
-        if body['devices']:
-            await self._api(http, 'POST', '/v1.0/devices/actions', body)
+        saved = self.saved
+        await self._home(http, lambda home: home.actions(http, saved))
         self.saved = None
 
     # ---------- что сейчас должно гореть ----------

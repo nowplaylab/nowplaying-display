@@ -1,65 +1,33 @@
 """Лента или лампа Yeelight напрямую по домашней сети (без Яндекса и интернета).
 
 На ленте в приложении Yeelight должно быть включено «Управление по локальной сети» (LAN control).
-Протокол открытый: поиск — SSDP на 239.255.255.250:1982, команды — строки JSON по TCP 55443.
-Обычные команды лента принимает не чаще 60 в минуту, поэтому:
+Сам протокол — в библиотеке yeelight-lan (github.com/nowplaylab/yeelight-lan). Обычные команды
+лента принимает не чаще 60 в минуту, поэтому:
 - «Цвет обложки» — одна команда на трек, плавный переход делает сама лента;
 - «В такт» — музыкальный режим (set_music): лента сама подключается к серверу и принимает
   команды без ответа и без ограничения частоты — яркость следует за басами, цвет — обложке.
 
-Проверка без ленты: tools/yeelight-emu/yeelight_emu.py.
+Проверка без ленты: python -m yeelight_lan.emulator (или tools/yeelight-emu).
 """
 import asyncio
 import colorsys
-import json
 import logging
-import socket
 import time
+
+import yeelight_lan
+from yeelight_lan import Bulb, YeelightError
 
 import lamp
 
 log = logging.getLogger('nowplaying')
 
-SSDP = ('239.255.255.250', 1982)
-SEARCH = ('M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1982\r\nMAN: "ssdp:discover"\r\n'
-          'ST: wifi_bulb\r\n\r\n').encode()
 BEAT_FPS = 20
 
 
 def discover(timeout=2.0):
-    """Найти ленты и лампы Yeelight в сети: [{id, name, model, ip, port, color}] (блокирующий вызов)."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
-    s.settimeout(0.3)
-    found = {}
-    try:
-        end = time.time() + timeout
-        s.sendto(SEARCH, SSDP)
-        sent_again = False
-        while time.time() < end:
-            if not sent_again and time.time() > end - timeout / 2:
-                s.sendto(SEARCH, SSDP)   # UDP может потеряться — спросим ещё раз
-                sent_again = True
-            try:
-                data, addr = s.recvfrom(4096)
-            except socket.timeout:
-                continue
-            h = {}
-            for line in data.decode(errors='replace').split('\r\n')[1:]:
-                if ':' in line:
-                    k, v = line.split(':', 1)
-                    h[k.strip().lower()] = v.strip()
-            loc = h.get('location', '')
-            if not loc.startswith('yeelight://') or not h.get('id'):
-                continue
-            host, _, port = loc[len('yeelight://'):].partition(':')
-            sup = h.get('support', '').split()
-            found[h['id']] = {'id': h['id'], 'name': h.get('name') or '', 'model': h.get('model', ''),
-                              'ip': host, 'port': int(port or 55443),
-                              'color': 'set_rgb' in sup or 'set_hsv' in sup, 'music': 'set_music' in sup}
-    finally:
-        s.close()
-    return list(found.values())
+    """Найти ленты и лампы Yeelight в сети: [{id, name, model, ip, port, color, music}] (блокирующий вызов)."""
+    return [{'id': d.id, 'name': d.name, 'model': d.model, 'ip': d.ip, 'port': d.port,
+             'color': d.color, 'music': d.music} for d in yeelight_lan.discover(timeout)]
 
 
 class Strip:
@@ -74,9 +42,7 @@ class Strip:
         self.last_play = 0
         self.level_fn = lambda: 0.0   # уровень звука 0..1 (подставляет сервер)
         self.color_cache = {}
-        self._music = None         # (reader, writer) музыкального режима
-        self._music_srv = None
-        self._next_id = 1
+        self._music = None         # yeelight_lan.MusicMode
 
     # ---------- соединение ----------
 
@@ -93,39 +59,19 @@ class Strip:
         self.error = '' if self.devices else 'Лента не нашлась. Проверь, что в приложении Yeelight включено «Управление по локальной сети»'
         return self.devices
 
-    async def _cmd(self, method, params, want_reply=True):
-        """Одна обычная команда (своё соединение — так проще и надёжнее при обрывах)."""
+    async def _cmd(self, method, params):
+        """Одна обычная команда. Результат или None (ошибка — в self.error)."""
         d = self.device()
         if not d:
             return None
         try:
-            reader, writer = await asyncio.wait_for(asyncio.open_connection(d['ip'], d['port']), 3)
-        except (OSError, asyncio.TimeoutError):
+            res = await Bulb(d['ip'], d['port']).command(method, params)
+        except YeelightError as e:
             self.error = 'Лента не отвечает'
+            log.debug('yeelight: %s', e)
             return None
-        try:
-            cid = self._next_id = self._next_id + 1
-            writer.write(json.dumps({'id': cid, 'method': method, 'params': params}).encode() + b'\r\n')
-            await writer.drain()
-            if not want_reply:
-                return True
-            end = time.time() + 3
-            while time.time() < end:
-                line = await asyncio.wait_for(reader.readline(), 3)
-                if not line:
-                    break
-                msg = json.loads(line)
-                if msg.get('id') == cid:
-                    if 'error' in msg:
-                        self.error = 'Лента: ' + str(msg['error'].get('message'))
-                        return None
-                    self.error = ''
-                    return msg.get('result')
-        except (OSError, ValueError, asyncio.TimeoutError):
-            self.error = 'Лента не отвечает'
-        finally:
-            writer.close()
-        return None
+        self.error = ''
+        return res
 
     # ---------- музыкальный режим ----------
 
@@ -133,54 +79,30 @@ class Strip:
         d = self.device()
         if not d or not d.get('music'):
             return False
-        got = asyncio.get_running_loop().create_future()
-
-        def on_conn(r, w):
-            if not got.done():
-                got.set_result((r, w))
-            else:
-                w.close()
-        self._music_srv = await asyncio.start_server(on_conn, '0.0.0.0', 0)
-        port = self._music_srv.sockets[0].getsockname()[1]
-        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        m = Bulb(d['ip'], d['port']).music()
         try:
-            probe.connect((d['ip'], 1))
-            my_ip = probe.getsockname()[0]
-        finally:
-            probe.close()
-        if await self._cmd('set_music', [1, my_ip, port]) is None:
-            await self._music_stop()
-            return False
-        try:
-            self._music = await asyncio.wait_for(got, 5)
-        except asyncio.TimeoutError:
+            await m.start()
+        except YeelightError as e:
             self.error = 'Лента не включила музыкальный режим'
-            await self._music_stop()
+            log.info('yeelight: %s', e)
             return False
+        self._music = m
         log.info('yeelight: music mode on (%s)', d['ip'])
         return True
 
     async def _music_stop(self):
         if self._music:
-            self._music[1].close()
+            await self._music.stop()
             self._music = None
-        if self._music_srv:
-            self._music_srv.close()
-            self._music_srv = None
 
     def _music_send(self, method, params):
         if not self._music:
             return False
-        if self._music[1].is_closing() or self._music[0].at_eof():   # лента выключилась или перезапустилась
+        if not self._music.alive:     # лента выключилась или перезапустилась
             self._music = None
             self.sent = None
             return False
-        try:
-            self._music[1].write(json.dumps({'id': 1, 'method': method, 'params': params}).encode() + b'\r\n')
-            return True
-        except (OSError, RuntimeError):
-            self._music = None
-            return False
+        return self._music.send(method, params)
 
     # ---------- басы ----------
 

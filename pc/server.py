@@ -51,6 +51,7 @@ import weather
 import widgets
 import updater
 import volume
+import synced_lyrics
 import yandex
 
 VERSION = '2.4'     # версия программы для ПК (= тег релиза на GitHub)
@@ -59,7 +60,6 @@ UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
 ART_SIZE = 480       # обложка для экрана 1024x600
 ITUNES = 'https://itunes.apple.com/search'
-LRCLIB = 'https://lrclib.net/api'
 UA = 'NowPlaying-Tab3/1.0 (personal LAN display)'
 
 log = logging.getLogger('nowplaying')
@@ -337,58 +337,16 @@ async def update_state(app, mgr):
                  app=app_id, position_ms=int(pos), duration_ms=int(dur), measured_at=now_ms())
 
 
-def parse_lrc(text):
-    lines = []
-    for raw in (text or '').splitlines():
-        stamps = re.findall(r'\[(\d+):(\d+(?:\.\d+)?)\]', raw)
-        words = re.sub(r'\[[^\]]*\]', '', raw).strip()
-        for m, s in stamps:
-            lines.append({'t': int((int(m) * 60 + float(s)) * 1000), 'text': words})
-    return sorted(lines, key=lambda l: l['t'])
-
-
 async def fetch_lyrics(app, tid, title, artist, album, dur):
-    """Текст из LRCLIB. Синхронный берём только если длительность совпала (±4 с),
-    иначе тайминги разъедутся (ремикс, live, другая версия)."""
-    result = {'synced': [], 'plain': ''}
+    """Текст через synced_lyrics: LRCLIB (синхронный — только если длительность совпала), запасной — Яндекс."""
     try:
-        http = app['http']
-        q = {'track_name': title, 'artist_name': artist}
-        cands = []
-        if artist:
-            params = dict(q, album_name=album, duration=int(dur / 1000)) if dur else dict(q)
-            async with http.get(f'{LRCLIB}/get', params=params) as r:
-                if r.status == 200:
-                    cands.append(await r.json())
-        async with http.get(f'{LRCLIB}/search', params=q if artist else {'q': title}) as r:
-            if r.status == 200:
-                cands += await r.json()
-
-        def diff(c):
-            return abs((c.get('duration') or 0) * 1000 - dur) if dur and c.get('duration') else None
-
-        limit_synced = 4000 if artist else 2000    # без артиста — строже
-        synced = [c for c in cands if c.get('syncedLyrics') and
-                  (diff(c) is None and dur == 0 and artist or diff(c) is not None and diff(c) <= limit_synced)]
-        synced.sort(key=lambda c: diff(c) or 0)
-        plain = [c for c in cands if c.get('plainLyrics') and (artist or (diff(c) is not None and diff(c) <= 5000))]
-        plain.sort(key=lambda c: diff(c) if diff(c) is not None else 10 ** 9)
-        if synced:
-            result = {'synced': parse_lrc(synced[0]['syncedLyrics']), 'plain': synced[0].get('plainLyrics') or ''}
-        elif plain:
-            result = {'synced': [], 'plain': plain[0]['plainLyrics']}
-    except Exception as e:
+        got = await synced_lyrics.fetch(app['http'], title, artist, album, dur)
+    except Exception as e:      # библиотека сама глушит сеть; это на всякий случай
         log.warning('lyrics: %s', e)
-    source = 'lrclib'
-    # запасной источник обычного текста — Яндекс Музыка
-    if not result['synced'] and not result['plain']:
-        try:
-            result['plain'] = await yandex.plain_lyrics(app['http'], title, artist, dur)
-            source = 'yandex'
-        except Exception as e:
-            log.warning('lyrics yandex: %s', e)
+        got = synced_lyrics.Lyrics()
+    result = {'synced': got.synced, 'plain': got.plain}
     log.info('lyrics for %s — %s: synced %d, plain %d (%s)', artist, title, len(result['synced']),
-             len(result['plain']), source)
+             len(result['plain']), got.source or 'none')
     lyrics[tid] = result
     lyrics_jobs.pop(tid, None)
     if len(lyrics) > 50:
