@@ -68,6 +68,8 @@ state = {'track_id': None, 'playing': False, 'title': '', 'artist': '', 'album':
 art = {}       # track_id -> (jpeg bytes, цвет фона)
 lyrics = {}    # track_id -> dict
 lyrics_jobs = {}
+lyrics_meta = {}  # track_id -> {'complete', 'dur', 'at', 'tries'}: как искали, чтобы знать, искать ли ещё
+lyrics_seen = {}  # track_id -> когда трек впервые увидели (ждём длительность, но недолго)
 art_attempts = {}
 current = {}  # выбранная сессия Windows (для кнопок управления)
 seek_hold = {}  # после перемотки Windows ещё пару секунд отдаёт старую позицию — держим новую
@@ -328,7 +330,7 @@ async def update_state(app, mgr):
     if tid and artist and tid not in itunes_jobs:
         itunes_jobs[tid] = asyncio.create_task(improve_art(app, tid, title, artist))
     # текст ищем, когда известны и название, и (по возможности) длительность
-    if tid and tid not in lyrics and tid not in lyrics_jobs and (dur > 0 or tid == state['track_id']):
+    if tid and want_lyrics(tid, dur):
         lyrics_jobs[tid] = asyncio.create_task(fetch_lyrics(app, tid, title, artist, props.album_title or '', dur))
     if tid and dur > 0:
         CLIPS.request(app['http'], tid, title, artist, dur)
@@ -337,20 +339,43 @@ async def update_state(app, mgr):
                  app=app_id, position_ms=int(pos), duration_ms=int(dur), measured_at=now_ms())
 
 
+def want_lyrics(tid, dur, wait=True):
+    """Пора ли искать текст: впервые (когда известна длина трека или через 3 с без неё), заново —
+    если в прошлый раз искали без длины, или источник не ответил (до 4 попыток, с паузой)."""
+    if tid in lyrics_jobs:
+        return False
+    now = time.time()
+    meta = lyrics_meta.get(tid)
+    if meta is None:
+        seen = lyrics_seen.setdefault(tid, now)
+        if len(lyrics_seen) > 300:
+            lyrics_seen.pop(next(iter(lyrics_seen)))
+        return not wait or dur > 0 or now - seen > 3
+    if meta['dur'] == 0 and dur > 0:
+        return True
+    return not meta['complete'] and meta['tries'] < 4 and now - meta['at'] > 15 * meta['tries']
+
+
 async def fetch_lyrics(app, tid, title, artist, album, dur):
     """Текст через synced_lyrics: LRCLIB (синхронный — только если длительность совпала), запасной — Яндекс."""
     try:
         got = await synced_lyrics.fetch(app['http'], title, artist, album, dur)
     except Exception as e:      # библиотека сама глушит сеть; это на всякий случай
         log.warning('lyrics: %s', e)
-        got = synced_lyrics.Lyrics()
+        got = synced_lyrics.Lyrics(complete=False)
     result = {'synced': got.synced, 'plain': got.plain}
-    log.info('lyrics for %s — %s: synced %d, plain %d (%s)', artist, title, len(result['synced']),
-             len(result['plain']), got.source or 'none')
-    lyrics[tid] = result
+    tries = lyrics_meta.get(tid, {}).get('tries', 0) + 1
+    log.info('lyrics for %s — %s: synced %d, plain %d (%s)%s', artist, title, len(result['synced']),
+             len(result['plain']), got.source or 'none', '' if got.complete else f', not all sources answered, try {tries}')
+    # не смогли проверить — старый найденный текст не затираем
+    if got or got.complete or tid not in lyrics:
+        lyrics[tid] = result
+    lyrics_meta[tid] = {'complete': got.complete or bool(got.synced), 'dur': dur, 'at': time.time(), 'tries': tries}
     lyrics_jobs.pop(tid, None)
-    if len(lyrics) > 50:
-        lyrics.pop(next(iter(lyrics)))
+    while len(lyrics) > 50:
+        old = next(iter(lyrics))
+        lyrics.pop(old)
+        lyrics_meta.pop(old, None)
 
 
 def jsonr(data):
@@ -433,7 +458,7 @@ async def use_source(app, src, v):
                 log.warning('%s art: %s', src.name, e)
     if artist and tid not in itunes_jobs:
         itunes_jobs[tid] = asyncio.create_task(improve_art(app, tid, title, artist))
-    if tid not in lyrics and tid not in lyrics_jobs:
+    if want_lyrics(tid, dur, wait=False):
         lyrics_jobs[tid] = asyncio.create_task(fetch_lyrics(app, tid, title, artist, v['album'], dur))
     if dur > 0:
         CLIPS.request(app['http'], tid, title, artist, dur)
@@ -522,14 +547,39 @@ async def h_art_blur(request):
     return web.Response(body=cached[1], content_type='image/jpeg', headers={'Cache-Control': 'max-age=3600'})
 
 
+def lyrics_pending(tid):
+    """Текст ещё может появиться: ищем сейчас, или это играющий трек, который ещё не искали
+    (ждём длину трека) либо будем искать снова, потому что источник не ответил."""
+    if tid in lyrics_jobs:
+        return True
+    if tid != state['track_id']:
+        return False
+    meta = lyrics_meta.get(tid)
+    return meta is None or (not lyrics.get(tid, {}).get('synced') and not lyrics.get(tid, {}).get('plain')
+                            and not meta['complete'] and meta['tries'] < 4)
+
+
 async def h_lyrics(request):
     tid = request.match_info['id']
-    if tid in lyrics_jobs:
+    loop = asyncio.get_running_loop()
+    end = loop.time() + 10
+    # ждём до 10 с: приложение спрашивает текст сразу при смене трека, а поиск может ещё не начаться
+    while lyrics_pending(tid) and not (lyrics.get(tid, {}).get('synced') or lyrics.get(tid, {}).get('plain')):
+        left = end - loop.time()
+        if left <= 0:
+            break
+        job = lyrics_jobs.get(tid)
         try:
-            await asyncio.wait_for(asyncio.shield(lyrics_jobs[tid]), 10)
+            if job:
+                await asyncio.wait_for(asyncio.shield(job), left)
+            else:
+                await asyncio.sleep(min(0.25, left))
         except asyncio.TimeoutError:
-            pass
-    return jsonr(lyrics.get(tid) or {'synced': [], 'plain': '', 'pending': tid in lyrics_jobs})
+            break
+    res = dict(lyrics.get(tid) or {'synced': [], 'plain': ''})
+    if not (res['synced'] or res['plain']) and lyrics_pending(tid):
+        res['pending'] = True
+    return jsonr(res)
 
 
 class Discovery(asyncio.DatagramProtocol):
