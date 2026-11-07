@@ -70,6 +70,7 @@ DEFAULTS = {
     'strip_on': False,
     'strip_id': '',
     'strip_mode': 'cover',         # cover — цвет обложки, beat — в такт (музыкальный режим)
+    'strip_delay': 0,              # «в такт»: задержать ленту, мс (0…500) — под колонки и наушники по Bluetooth
     # программа
     'auto_update': True,
 }
@@ -322,7 +323,7 @@ class Settings:
         for k, lo, hi in (('track_dim', 0, 90), ('clock_dim', 0, 90), ('night_from', 0, 23),
                           ('night_to', 0, 23), ('dark_after_min', 0, 720), ('color_sat', -50, 100),
                           ('color_contrast', -50, 50), ('color_bright', -30, 30), ('color_warm', -50, 50),
-                          ('lamp_bright', 10, 100)):
+                          ('lamp_bright', 10, 100), ('strip_delay', 0, 500)):
             if k in clean:
                 clean[k] = max(lo, min(hi, clean[k]))
         return clean

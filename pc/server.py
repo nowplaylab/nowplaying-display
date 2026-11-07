@@ -732,7 +732,10 @@ async def on_startup(app):
     app['frame'] = asyncio.create_task(FRAME.watch())
     app['update'] = asyncio.create_task(UPDATER.watch(app['http']))
     app['lamp'] = asyncio.create_task(LAMP.watch(app['http'], lambda: (state['playing'], state['track_id']), art))
-    STRIP.level_fn = lambda: STRIP.bass(BANDS.values)   # «в такт» — только басы, 40–140 Гц
+    STRIP.level_fn = lambda: STRIP.bass(BANDS.values)   # запасной путь: басы из полос, 40–140 Гц
+    loop = asyncio.get_running_loop()
+    # быстрый путь: поток захвата 100 раз в секунду отдаёт уровень басов прямо ленте
+    BANDS.on_bass = lambda lvl: loop.call_soon_threadsafe(STRIP.on_bass, lvl) if STRIP_BASS['on'] else None
 
     def strip_wants_bands(on):
         STRIP_BASS['on'] = on

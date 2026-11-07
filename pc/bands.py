@@ -9,6 +9,9 @@
 тихие и громкие треки выглядят одинаково. Сглаживание: сразу вверх, быстро вниз.
 
 Захват — в своём потоке и только пока он нужен (играет музыка и визуализатор включён).
+
+Для ленты «в такт» отдельно слушаем басы (40–150 Гц) 100 раз в секунду по короткому окну
+(1024 сэмпла ≈ 21 мс) и сразу отдаём уровень в on_bass — без ожидания следующего кадра полос.
 """
 import logging
 import threading
@@ -21,6 +24,8 @@ BANDS = 24
 RATE = 48000
 FRAMES = 2048
 FPS = 30
+CHUNK = RATE // 100          # 10 мс — так часто проверяем басы
+BASS_FRAMES = 1024
 LOW, HIGH = 40.0, 16000.0
 
 
@@ -31,6 +36,7 @@ class Bands:
         self.clients = 0
         self._thread = None
         self.error = ''
+        self.on_bass = None     # f(уровень 0..1) — вызывается из потока захвата 100 раз в секунду
 
     def want(self, on):
         self.active = on
@@ -62,17 +68,25 @@ class Bands:
         tilt = np.linspace(0, 22, BANDS, dtype=np.float32)   # дБ: поднимаем верха, чтобы спектр стал ровным
         ref = None                                         # общий уровень трека, дБ
         bmean = None                                       # средний уровень каждой полосы за ~10 с
+        bass = Bass(np)
         try:
             while self.active:
                 try:
                     speaker = sc.default_speaker()
                     mic = sc.get_microphone(id=str(speaker.name), include_loopback=True)
-                    with mic.recorder(samplerate=RATE, channels=2, blocksize=FRAMES // 2) as rec:
+                    with mic.recorder(samplerate=RATE, channels=2, blocksize=CHUNK) as rec:
                         buf = np.zeros(FRAMES, dtype=np.float32)
-                        step = RATE // FPS
+                        step, got = RATE // FPS, 0
                         while self.active:
-                            chunk = rec.record(numframes=step).mean(axis=1).astype(np.float32)
+                            chunk = rec.record(numframes=CHUNK).mean(axis=1).astype(np.float32)
                             buf = np.concatenate([buf[len(chunk):], chunk])
+                            cb = self.on_bass
+                            if cb:
+                                cb(bass.feed(buf[-BASS_FRAMES:]))
+                            got += len(chunk)
+                            if got < step:     # полосы для визуализатора — по-прежнему ~30 раз в секунду
+                                continue
+                            got -= step
                             spec = np.abs(np.fft.rfft(buf * window))
                             raw = np.array([spec[ix].max() for ix in idx], dtype=np.float32)
                             db = 20 * np.log10(raw + 1e-9) + tilt
@@ -95,3 +109,32 @@ class Bands:
                     time.sleep(1)
         finally:
             self.values = [0.0] * BANDS
+            if self.on_bass:
+                self.on_bass(0.0)
+
+
+class Bass:
+    """Уровень басов 0..1 для ленты: удар бочки — вспышка, ровный гул — спокойно.
+    Громкость меряем от уровня басов в этом треке (быстро вверх, медленно вниз), а удар —
+    как превышение над средним за последние ~0,3 с."""
+
+    def __init__(self, np):
+        self.np = np
+        self.window = np.hanning(BASS_FRAMES).astype(np.float32)
+        freqs = np.fft.rfftfreq(BASS_FRAMES, 1 / RATE)
+        self.bins = np.where((freqs >= 40) & (freqs <= 150))[0]
+        self.ref = None
+        self.avg = 0.0
+
+    def feed(self, samples):
+        np = self.np
+        spec = np.abs(np.fft.rfft(samples * self.window))
+        db = 20 * np.log10(float(np.sqrt((spec[self.bins] ** 2).sum())) + 1e-9)
+        if db < -10:                          # тишина
+            self.avg *= 0.9
+            return 0.0
+        k = 0.05 if self.ref is None or db > self.ref else 0.002
+        self.ref = db if self.ref is None else self.ref * (1 - k) + db * k
+        now = min(1.0, max(0.0, (db - (self.ref - 14)) / 18)) ** 1.4
+        self.avg = self.avg * 0.968 + now * 0.032
+        return max(0.0, min(1.0, 0.35 * now + 1.4 * max(0.0, now - self.avg)))

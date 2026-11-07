@@ -598,6 +598,10 @@ a.btn { color: var(--text); text-decoration: none; }
           <div class="t"><b>Режим</b><small>«В такт» — яркость следует за басами (музыкальный режим ленты)</small></div>
           <div class="seg"><button data-smode="cover">Цвет обложки</button><button data-smode="beat">В такт</button></div>
         </div>
+        <div class="row" id="stripDelayRow">
+          <div class="t"><b>Сдвиг ленты</b><small>Если колонка или наушники по Bluetooth и лента мигает раньше звука — сдвинь, пока не совпадёт</small></div>
+          <div class="range"><input type="range" min="0" max="500" step="10" data-key="strip_delay" data-unit=" мс"><output style="width: 56px"></output></div>
+        </div>
       </div>
     </section>
 
@@ -1047,6 +1051,7 @@ function renderStrip(st) {
   const R = st.strip, s = st.settings;
   if (!R) return;
   for (const b of $$('[data-smode]')) b.classList.toggle('on', b.dataset.smode === s.strip_mode);
+  $('#stripDelayRow').hidden = s.strip_mode !== 'beat';
   const dev = R.devices.find(d => d.id === s.strip_id);
   $('#stripDev').textContent = dev ? `${dev.name || 'Yeelight'} · ${dev.model} · ${dev.ip}` : (R.error || (s.strip_id ? 'Ищу в сети…' : 'Не выбрана'));
   const sub = $('#stripSub'); sub.textContent = '';

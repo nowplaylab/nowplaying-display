@@ -22,6 +22,7 @@ import lamp
 log = logging.getLogger('nowplaying')
 
 BEAT_FPS = 20
+MIN_GAP = 0.015       # «в такт»: не чаще ~65 команд в секунду
 
 
 def discover(timeout=2.0):
@@ -43,6 +44,10 @@ class Strip:
         self.level_fn = lambda: 0.0   # уровень звука 0..1 (подставляет сервер)
         self.color_cache = {}
         self._music = None         # yeelight_lan.MusicMode
+        self._beat = None          # «в такт» сейчас: яркость, к которой приводим уровень басов
+        self._push_at = 0          # когда последний раз пришёл уровень от быстрого слушателя
+        self._last_b = None
+        self._sent_b_at = 0
 
     # ---------- соединение ----------
 
@@ -119,6 +124,28 @@ class Strip:
         self._bass_avg = avg * 0.85 + now * 0.15
         return max(0.0, min(1.0, 0.35 * now + 1.4 * max(0.0, now - avg)))
 
+    # ---------- быстрый путь «в такт» ----------
+
+    def on_bass(self, level):
+        """Уровень басов от быстрого слушателя (100 раз в секунду, в цикле asyncio).
+        Яркость уходит сразу, а не на следующем кадре; при сдвиге — через strip_delay мс."""
+        self._push_at = time.monotonic()
+        if self._beat is None or not self._music:
+            return
+        b = max(3, round(self._beat * (0.25 + 0.75 * max(0.0, min(1.0, level)))))
+        if b == self._last_b or time.monotonic() - self._sent_b_at < MIN_GAP:
+            return
+        self._last_b, self._sent_b_at = b, time.monotonic()
+        delay = self.settings['strip_delay'] / 1000
+        if delay > 0:
+            asyncio.get_running_loop().call_later(delay, self._send_bright, b)
+        else:
+            self._send_bright(b)
+
+    def _send_bright(self, b):
+        if self._beat is not None and self._music and not self._music_send('set_bright', [b, 'sudden', 30]):
+            self._music = None    # оборвалось — _tick включит музыкальный режим заново
+
     # ---------- что светить ----------
 
     def info(self):
@@ -147,6 +174,7 @@ class Strip:
     async def _tick(self, now_state, art, want_level):
         s = self.settings.get()
         if not s['strip_on'] or not s['strip_id']:
+            self._beat = None
             want_level(False)
             if self._music:
                 await self._music_stop()
@@ -177,6 +205,8 @@ class Strip:
         idle = not playing and time.time() - self.last_play > lamp.IDLE_AFTER
         beat = s['strip_mode'] == 'beat' and playing and color is not None
         want_level(beat)
+        if not beat:
+            self._beat = None
         if not beat and self._music:
             await self._music_stop()
         if idle:
@@ -208,8 +238,6 @@ class Strip:
             if not self._music and not await self._music_start():
                 beat = False
             else:
-                lvl = max(0.0, min(1.0, self.level_fn()))
-                b = max(3, round(bright * (0.25 + 0.75 * lvl)))
                 rgb = self._rgb(target)
                 if self.sent is None or self.sent[0] != target:
                     if rgb is not None:
@@ -217,6 +245,12 @@ class Strip:
                     else:
                         self._music_send('set_ct_abx', [target[1], 'sudden', 30])
                     self.sent = (target, None)
+                self._beat = bright
+                if time.monotonic() - self._push_at < 0.5:
+                    return                     # яркость шлёт on_bass сразу на удар
+                # быстрого слушателя нет — по-старому, раз в кадр
+                lvl = max(0.0, min(1.0, self.level_fn()))
+                b = max(3, round(bright * (0.25 + 0.75 * lvl)))
                 if not self._music_send('set_bright', [b, 'sudden', 30]):
                     await self._music_stop()   # соединение оборвалось — в следующий раз включим заново
                 return
