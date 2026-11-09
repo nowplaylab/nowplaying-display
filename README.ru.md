@@ -191,6 +191,13 @@ ANDROID_SDK=/c/android-sdk sh android/build.sh
 
 Приложение (`android/`) написано на Java: minSdk 16, targetSdk 17, без сторонних библиотек. Шрифт — [Inter 4.1](https://github.com/rsms/inter) (SIL Open Font License, `android/assets/fonts/LICENSE-Inter.txt`): Inter Display Bold для названия и текста песни, Inter Display SemiBold для часов, Inter Medium для остального. Файлы урезаны до латиницы и кириллицы. Он похож на SF Pro из Apple Music, а SF Pro встраивать в Android-приложения лицензия Apple не разрешает.
 
+## Поддержать проект
+
+NowPlaying бесплатный. Если он вам пригодился, можно поддержать разработку:
+
+- [DonationAlerts](https://www.donationalerts.com/r/tryshyzov)
+- USDT, только сеть TRON (TRC20): `TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc` ([QR](https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc))
+
 ## Лицензия
 
 [MIT](LICENSE)

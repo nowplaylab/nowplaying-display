@@ -193,6 +193,13 @@ The server (`pc/server.py`) is written in Python with aiohttp, winrt and Pillow.
 
 The app (`android/`) is written in Java: minSdk 16, targetSdk 17, no third-party libraries. The font is [Inter 4.1](https://github.com/rsms/inter) (SIL Open Font License, `android/assets/fonts/LICENSE-Inter.txt`): Inter Display Bold for the title and lyrics, Inter Display SemiBold for the clock, Inter Medium for everything else. The files are subset to Latin and Cyrillic. It looks similar to SF Pro from Apple Music, whose license doesn't allow embedding it in Android apps.
 
+## Support the project
+
+NowPlaying is free. If it is useful to you, you can support development:
+
+- [DonationAlerts](https://www.donationalerts.com/r/tryshyzov)
+- USDT, TRON network (TRC20) only: `TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc` ([QR](https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc))
+
 ## License
 
 [MIT](LICENSE)
