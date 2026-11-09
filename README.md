@@ -45,7 +45,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-2.1.apk` for the tablet.
+- `NowPlaying-<version>.apk` for the tablet (for example, `NowPlaying-1.13.apk`).
 
 ### 1. Server on the PC
 
@@ -72,7 +72,7 @@ Tray menu (right-click the icon):
 
 ### 2. App on the tablet
 
-Copy `NowPlaying-2.1.apk` to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
+Copy the `.apk` file to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
 
 Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on its own** and starts showing your music. If it doesn't, long-press the screen and enter the address shown in the tray menu on the PC.
 
