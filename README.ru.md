@@ -43,7 +43,7 @@
 Скачайте два файла со страницы [последнего релиза](../../releases/latest):
 
 - `NowPlayingServer.exe` для ПК;
-- `NowPlaying-<версия>.apk` для планшета (например, `NowPlaying-1.13.apk`).
+- `NowPlaying-<версия>.apk` для планшета.
 
 ### 1. Сервер на ПК
 

@@ -45,7 +45,7 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
 Download two files from the [latest release](../../releases/latest):
 
 - `NowPlayingServer.exe` for the PC;
-- `NowPlaying-<version>.apk` for the tablet (for example, `NowPlaying-1.13.apk`).
+- `NowPlaying-<version>.apk` for the tablet.
 
 ### 1. Server on the PC
 
