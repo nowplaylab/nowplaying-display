@@ -83,8 +83,8 @@ Darwin)
     rm -f "$ROOT/release/$OUT_NAME.dmg"
     mkdir dmg-src && cp -R "$APP" dmg-src/
     # create-dmg расставляет иконки через Finder; на сервере GitHub без экрана это иногда падает — тогда простой .dmg
-    create-dmg --volname "NowPlaying" --volicon icon.icns $BG --window-size 660 400 --icon-size 128 \
-        --icon NowPlaying.app 180 190 --app-drop-link 480 190 --hide-extension NowPlaying.app \
+    create-dmg --volname "NowPlaying" --volicon icon.icns $BG --window-size 660 400 --icon-size 96 \
+        --icon NowPlaying.app 120 290 --app-drop-link 120 95 --hide-extension NowPlaying.app \
         --no-internet-enable "$ROOT/release/$OUT_NAME.dmg" dmg-src \
         || { echo "create-dmg не справился, делаю простой .dmg" >&2
              rm -f "$ROOT/release/$OUT_NAME.dmg"; ln -s /Applications dmg-src/Applications
