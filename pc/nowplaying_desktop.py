@@ -226,19 +226,30 @@ def run_tray(srv, log_path, first_run):
     return True
 
 
-def _mark_template(icon):
-    """Одноцветный значок строки меню macOS сам перекрашивается под светлую и тёмную тему."""
-    if not os.path.exists(resource('menubar@2x.png')):
-        return
-    orig = icon._assert_image
+MENUBAR_GLYPH = 'menubar-glyph@2x.png'   # 32×22 px = 16×11 pt на Retina
+MENUBAR_SIZE = (16, 11)
 
-    def patched():
-        orig()
-        try:
-            icon._icon_image.setTemplate_(True)
-        except Exception:
-            pass
-    icon._assert_image = patched
+
+def _mark_template(icon):
+    """Значок строки меню берём сами: pystray растягивает картинку на всю высоту строки меню
+    (выходит крупно и мыльно). Здесь — чёткий @2x-рисунок нужного размера в пунктах, в режиме
+    «шаблон»: macOS сама красит его под светлую и тёмную строку."""
+    path = resource(MENUBAR_GLYPH)
+    if not os.path.exists(path):
+        return
+
+    def assert_image():
+        if icon._icon_image is not None:
+            return
+        import AppKit
+        import Foundation
+        with open(path, 'rb') as f:
+            img = AppKit.NSImage.alloc().initWithData_(Foundation.NSData.dataWithBytes_length_(f.read(), os.path.getsize(path)))
+        img.setSize_(MENUBAR_SIZE)
+        img.setTemplate_(True)
+        icon._icon_image = img
+        icon._status_item.button().setImage_(img)
+    icon._assert_image = assert_image
 
 
 def main():

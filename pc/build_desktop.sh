@@ -42,7 +42,7 @@ Darwin)
     done
     iconutil -c icns icon.iconset -o icon.icns
     EXTRA=""
-    for f in menubar.png menubar@2x.png; do
+    for f in menubar-glyph@2x.png menubar@2x.png; do
         [ -f "$ROOT/design/macos/$f" ] && cp "$ROOT/design/macos/$f" . && EXTRA="$EXTRA --add-data $f:."
     done
     # pc/mac — помощник для чтения панели «Сейчас играет» (mediaremote-adapter)
