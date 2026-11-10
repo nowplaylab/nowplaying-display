@@ -31,6 +31,7 @@ FIRST_RUN_FLAG = os.path.join(DATA_DIR, 'first-run-done')
 IS_MAC = sys.platform == 'darwin'
 FROZEN = getattr(sys, 'frozen', False)
 log = logging.getLogger('nowplaying')
+_crash_file = None   # держим открытым для faulthandler
 
 
 def resource(name):
@@ -193,17 +194,31 @@ def run_tray(srv, log_path, first_run):
         log.warning('tray unavailable: %s', e)
         return False
 
-    def refresher(icon):
+    # macOS разрешает трогать строку меню только из главного потока (иначе программа падает
+    # без следа в журнале), а setup у pystray работает в отдельном — передаём действия в главный
+    if IS_MAC:
+        from PyObjCTools import AppHelper
+        on_main = AppHelper.callAfter
+    else:
+        def on_main(fn, *args):
+            fn(*args)
+
+    def show(icon):
         icon.visible = True
+        log.info('tray icon shown')
+
+    def refresher(icon):
+        on_main(show, icon)
         while srv.is_alive():
+            time.sleep(3)
             try:
-                icon.update_menu()
+                on_main(icon.update_menu)
             except Exception:
                 log.exception('tray refresh')
-            time.sleep(3)
-        icon.stop()
+        on_main(icon.stop)
 
     try:
+        log.info('starting tray')
         icon.run(setup=refresher)
     except Exception as e:
         log.warning('tray failed: %s', e)
@@ -230,6 +245,14 @@ def main():
     os.makedirs(DATA_DIR, exist_ok=True)
     log_path = server.setup_logging(DATA_DIR)
     log.info('NowPlaying Server %s started on %s (pid %d)', server.VERSION, sys.platform, os.getpid())
+    # без консоли ошибки иначе пропадают: Python-ошибки — в журнал, падения глубже — в crash.log
+    sys.excepthook = lambda t, v, tb: log.critical('crash', exc_info=(t, v, tb))
+    threading.excepthook = lambda a: log.critical('crash in thread %s', a.thread and a.thread.name,
+                                                  exc_info=(a.exc_type, a.exc_value, a.exc_traceback))
+    import faulthandler
+    global _crash_file
+    _crash_file = open(os.path.join(DATA_DIR, 'crash.log'), 'a', encoding='utf-8')
+    faulthandler.enable(_crash_file)
 
     if already_running():
         log.info('already running, opening settings')
@@ -242,6 +265,7 @@ def main():
     if srv.error:
         log.error('cannot start server on port %s: %s', server.HTTP_PORT, srv.error)
         return
+    log.info('server listening on %s', server.HTTP_PORT)
 
     first_run = not os.path.exists(FIRST_RUN_FLAG)
     if first_run and FROZEN:

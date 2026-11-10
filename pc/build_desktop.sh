@@ -47,7 +47,7 @@ Darwin)
     done
     # pc/mac — помощник для чтения панели «Сейчас играет» (mediaremote-adapter)
     "$PY" -m PyInstaller $COMMON $EXTRA --icon icon.icns --osx-bundle-identifier com.nowplaylab.server \
-        --add-data "$SRC/mac:mac" --collect-submodules dbus_next nowplaying_desktop.py >pyinstaller.log 2>&1 \
+        --add-data "$SRC/mac:mac" --hidden-import PyObjCTools.AppHelper nowplaying_desktop.py >pyinstaller.log 2>&1 \
         || { tail -30 pyinstaller.log; exit 1; }
     APP=dist/NowPlaying.app
     PL="$APP/Contents/Info.plist"

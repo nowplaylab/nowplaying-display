@@ -110,11 +110,18 @@ jobs:
             sleep 1
           done
           curl -fs -H "X-NowPlaying: 1" "http://127.0.0.1:47811/api/settings" >/dev/null || ok=""
+          # программа должна жить дальше, а на маке — показать значок в строке меню
+          sleep 10
+          alive=""; kill -0 $PID 2>/dev/null && alive=1
+          tray=""; grep -q "tray icon shown" "$LOCALAPPDATA/NowPlaying/server.log" 2>/dev/null && tray=1
           kill $PID 2>/dev/null || true
           pkill -f NowPlaying 2>/dev/null || true
           cat "$LOCALAPPDATA/NowPlaying/server.log" 2>/dev/null | tail -30 || true
+          cat "$LOCALAPPDATA/NowPlaying/crash.log" 2>/dev/null | tail -40 || true
           [ -n "$ok" ] || { echo "сервер не ответил"; exit 1; }
-          echo "сервер отвечает"
+          [ -n "$alive" ] || { echo "программа упала после запуска"; exit 1; }
+          if [ "$RUNNER_OS" = macOS ] && [ -z "$tray" ]; then echo "значок в строке меню не появился"; exit 1; fi
+          echo "сервер отвечает, программа работает"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.file }}
