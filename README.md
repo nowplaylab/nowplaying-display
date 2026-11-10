@@ -141,11 +141,14 @@ To build your own `NowPlayingServer.exe`, install PyInstaller (`.venv\Scripts\py
 
 ### macOS and Linux
 
-There is no ready-made program for them yet: the server runs from source, but with one click.
-Download the source (green **Code → Download ZIP** button on the repository page) and unpack it.
+Ready-made programs are on the [release page](https://github.com/nowplaylab/nowplaying-display/releases/latest):
 
-- **macOS** (Apple Silicon and Intel, 10.15+). Open `tools/NowPlaying-mac.command` (if macOS refuses, right-click → Open). On the first run it downloads Python into the project folder if there is no suitable one, installs what it needs, starts the server and opens the settings window. Tracks come from the system Now Playing panel: **Yandex Music, browsers, Spotify, Apple Music, VLC**, anything shown in Control Center (via [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, bundled in `pc/mac`).
-- **Linux.** Needs `python3` and `python3-venv`. Run `sh tools/nowplaying-linux.sh` from a desktop session. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
+- **macOS:** `NowPlayingServer-mac-arm64.dmg` (Apple Silicon, M1 and later) or `NowPlayingServer-mac-intel.dmg` (Intel). Open the .dmg and drag NowPlaying to Applications. The program is not signed by Apple, so macOS refuses to open it the first time: go to System Settings → Privacy & Security and click Open Anyway. The icon appears in the menu bar, next to the clock. Tracks come from the system Now Playing panel: **Yandex Music, browsers, Spotify, Apple Music, VLC**, anything shown in Control Center (via [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, bundled in `pc/mac`).
+- **Linux (x86_64):** `NowPlayingServer-linux-x86_64.AppImage`. Make the file executable (`chmod +x`, or in the file's properties) and run it. The icon appears in the tray if your desktop shows one (GNOME needs the AppIndicator extension). Without the icon the server still runs, and launching the program again opens the settings window. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
+
+On the first run the program adds itself to autostart (you can turn this off in the icon menu) and opens the settings window. Settings and the log live in `~/NowPlaying`.
+
+You can also run it from source: `tools/NowPlaying-mac.command` on a Mac (it downloads Python if needed) or `sh tools/nowplaying-linux.sh` on Linux (needs `python3` and `python3-venv`). To build the program yourself, run `sh pc/build_desktop.sh <name>` on the system you are building for.
 
 On both systems the program does not update itself and cannot install the app over adb from the settings window. The glow and the visualizer work on a Mac only with an audio capture driver such as BlackHole.
 
