@@ -61,13 +61,14 @@ Darwin)
     if [ -d "$ROOT/design/macos/NowPlaying.icon" ] && command -v xcrun >/dev/null && xcrun --find actool >/dev/null 2>&1; then
         mkdir -p actool-out
         if xcrun actool "$ROOT/design/macos/NowPlaying.icon" --compile actool-out --app-icon NowPlaying \
+            --include-all-app-icons --output-format human-readable-text --notices --warnings --errors \
             --enable-on-demand-resources NO --development-region en --target-device mac \
-            --platform macosx --minimum-deployment-target 10.15 --output-partial-info-plist actool.plist >actool.log 2>&1 \
+            --platform macosx --minimum-deployment-target 11.0 --output-partial-info-plist actool.plist >actool.log 2>&1 \
             && [ -f actool-out/Assets.car ]; then
             cp actool-out/Assets.car "$APP/Contents/Resources/"
             /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string NowPlaying" "$PL"
         else
-            echo "actool не собрал NowPlaying.icon — остаётся обычная .icns" >&2; tail -5 actool.log >&2 || true
+            echo "actool не собрал NowPlaying.icon — остаётся обычная .icns" >&2; head -25 actool.log >&2 || true
         fi
     fi
     codesign --force --deep --sign - "$APP"     # подпись «для себя»: без неё Apple Silicon не запустит
