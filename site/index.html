@@ -36,6 +36,11 @@ body {
   background: linear-gradient(135deg, var(--c1), var(--c2) 55%, var(--c3)) fixed;
   transition: --c1 1.6s ease, --c2 1.6s ease, --c3 1.6s ease, --glow 1.6s ease;
 }
+/* фон переливается: два слоя пятен из тех же трёх цветов медленно плывут навстречу друг другу.
+   Двигается только сам слой (transform), поэтому это не нагружает телефон */
+/* фон-переливание: градиент из точек, как в Figma (точки плавают, цвета перетекают между ними).
+   Считается на крошечном холсте и растягивается — поэтому мягко и почти без нагрузки */
+#mesh { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 a { color: inherit; }
 :focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 6px; }
 .wrap { width: min(1240px, 100% - 48px); margin: 0 auto; }
@@ -116,26 +121,65 @@ h1 { font: 700 clamp(30px, 3.6vw, 50px)/1.06 'Inter Display', sans-serif; letter
 .btn svg { width: 18px; height: 18px; flex: none; }
 .fine { font-size: 14px; color: var(--ink-3); margin: 10px 0 0; text-align: right; }
 
-/* ---------- темы ---------- */
-.themes { padding: 30px 0 120px; }
 h2 { font: 700 clamp(30px, 3.6vw, 46px)/1.08 'Inter Display', sans-serif; letter-spacing: -.03em; margin: 0 0 14px; }
-.themes p.lead { color: var(--ink-2); max-width: var(--measure); margin: 0 0 40px; }
-.strip { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
-.strip figure { margin: 0; }
-.strip img { display: block; width: 100%; aspect-ratio: 1024 / 600; object-fit: cover; border-radius: 10px; background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
-.strip figcaption { margin-top: 12px; font: 600 17px 'Inter Display', sans-serif; }
-.strip figcaption span { display: block; font: 500 14px 'Inter', sans-serif; color: var(--ink-3); margin-top: 2px; }
-.strip figure:nth-child(even) { transform: translateY(28px); }
 
-/* ---------- часы: живые, ночью красные ---------- */
-.clock { padding: 80px 0 110px; text-align: center; transition: background-color 1s ease; }
-.clock .time { font: 600 clamp(110px, 24vw, 340px)/.9 'Inter Display', sans-serif; letter-spacing: -.045em; font-variant-numeric: tabular-nums; transition: color 1s ease; }
-.clock .date { font-size: clamp(18px, 2vw, 26px); color: var(--ink-2); margin-top: 14px; }
-.clock .wx { font-size: clamp(16px, 1.6vw, 21px); color: var(--ink-3); margin-top: 4px; }
-.clock p.say { max-width: var(--measure); margin: 46px auto 0; color: var(--ink-2); }
-.clock.is-night { background-color: rgba(0,0,0,.72); }
-.clock.is-night .time { color: var(--night); }
-.clock.is-night .date, .clock.is-night .wx { color: rgba(163,40,30,.75); }
+/* ---------- «что умеет»: одна песня, прокрутка страницы = её воспроизведение ---------- */
+.song { position: relative; height: calc(7 * 50svh + 100svh); }
+.pin { position: sticky; top: 0; height: 100svh; display: grid; grid-template-columns: minmax(0, 13fr) minmax(0, 10fr);
+  gap: clamp(32px, 5vw, 80px); align-items: center; }
+/* устройство: планшет, на последней строке рамка становится телевизором */
+.dev { background: var(--bezel); border-radius: clamp(18px, 2.6vw, 36px); padding: 3.6%;
+  box-shadow: inset 0 0 0 1.5px #333338, inset 0 2px 0 #3d3d43, 0 50px 80px -40px rgba(0,0,0,.65);
+  transition: padding .8s cubic-bezier(.3,.7,.25,1), border-radius .8s cubic-bezier(.3,.7,.25,1); }
+.dev.tv { padding: 1.1%; border-radius: 6px; }
+.shot { position: relative; aspect-ratio: 1024 / 600; overflow: hidden; border-radius: clamp(8px, 1.1vw, 16px); background: #000;
+  transition: aspect-ratio .8s cubic-bezier(.3,.7,.25,1), border-radius .8s cubic-bezier(.3,.7,.25,1); }
+.dev.tv .shot { aspect-ratio: 16 / 9; border-radius: 3px; }
+.shot img, .shot video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+  transition: opacity .6s ease, transform .9s cubic-bezier(.3,.7,.25,1); transform-origin: 74% 48%; }
+.shot .show { opacity: 1; }
+.shot .zoom { transform: scale(1.75); }
+.shot video.dip { opacity: 0; transition: opacity .25s ease; }
+/* часы на паузе — собраны на странице и идут по-настоящему */
+.clk { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #6e2352, #3d1a4a 55%, #1d1230); opacity: 0; transition: opacity .6s ease; }
+.clk::after { content: ''; position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1s ease; }
+.clk > * { position: relative; z-index: 1; transition: color 1s ease; }
+.clk.show { opacity: 1; }
+.clk .ct { font: 600 21cqw/.92 'Inter Display', sans-serif; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.clk .cd { font-size: 3.2cqw; color: rgba(255,255,255,.8); margin-top: 1.6cqw; }
+.clk .cw { font-size: 2.6cqw; color: rgba(255,255,255,.55); margin-top: .5cqw; }
+.clk.night::after { opacity: 1; }
+.clk.night .ct { color: var(--night); }
+.clk.night .cd, .clk.night .cw { color: rgba(163,40,30,.75); }
+.cap { margin: 14px 2px 0; font-size: 14px; color: rgba(255,255,255,.62); }
+
+.player { min-width: 0; }
+.player h2 { font-size: clamp(20px, 1.8vw, 24px); letter-spacing: -.01em; margin: 0; }
+.player .by { margin: 2px 0 22px; color: var(--ink-3); font-size: 15px; }
+.lines { position: relative; }
+.lines ol { list-style: none; margin: 0; padding: 0; transition: transform .55s cubic-bezier(.3,.7,.3,1); }
+.lines li { cursor: pointer; padding: 5px 0; }
+.lines h3 { margin: 0; font: 700 clamp(24px, 2.35vw, 34px)/1.18 'Inter Display', sans-serif; letter-spacing: -.02em;
+  color: rgba(255,255,255,.4); transition: color .45s ease; }
+.lines li:hover h3, .lines li.near h3 { color: rgba(255,255,255,.58); }
+.lines li.now h3 { color: var(--ink); }
+/* пояснение раскрывается только у текущей строки — высота растёт по-настоящему */
+.more { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s cubic-bezier(.3,.7,.25,1); }
+.more > div { overflow: hidden; }
+.more p { margin: 8px 0 6px; max-width: 28rem; color: var(--ink-2); font-size: 16px; }
+.lines li.now .more { grid-template-rows: 1fr; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 8px; font-size: 15px; color: var(--ink-3); }
+.chips span { transition: color .3s ease; }
+.chips span.on { color: var(--ink); }
+.pbar { height: 4px; border-radius: 4px; background: rgba(255,255,255,.22); margin-top: 26px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 0; background: rgba(255,255,255,.92); border-radius: inherit; }
+.ptimes { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+/* ночная строка: страница чернеет, текущая строка — тёмно-красная, как цифры на планшете */
+body.night .lines li.now h3 { color: var(--night); }
+body.night .lines li:not(.now) h3 { color: rgba(255,255,255,.12); }
+body.night .more p { color: rgba(163,40,30,.85); }
+body.night .pbar i { background: var(--night); }
 
 /* ---------- как поставить ---------- */
 .setup { padding: 60px 0 120px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 56px; align-items: start; }
@@ -155,9 +199,17 @@ footer a { color: var(--ink-2); }
 @media (max-width: 900px) {
   .fine { text-align: left; }
   .setup { grid-template-columns: 1fr; gap: 40px; }
-  .strip { grid-template-columns: repeat(5, 72%); overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
-  .strip figure { scroll-snap-align: start; }
-  .strip figure:nth-child(even) { transform: none; }
+  /* телефон и узкое окно: экран сверху, под ним окно со строками — как текст на планшете, текущая строка в фокусе */
+  .song { height: calc(7 * 42svh + 100svh); }
+  .pin { grid-template-columns: 1fr; align-content: center; gap: 22px; }
+  .cap { display: none; }
+  .player .by { margin-bottom: 10px; }
+  .lines { max-height: min(40svh, 300px); overflow: hidden; }
+  .lines.clip { -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 80%, transparent); mask-image: linear-gradient(transparent, #000 14%, #000 80%, transparent); }
+  .lines li { padding: 3px 0; }
+  .lines h3 { font-size: clamp(21px, 5.4vw, 30px); }
+  .more p { font-size: 15px; }
+  .pbar { margin-top: 12px; }
 }
 /* на телефоне планшет «поворачивается» вертикально, чтобы текст был читаемым */
 @media (max-width: 640px) {
@@ -181,11 +233,12 @@ footer a { color: var(--ink-2); }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  body, .lyr ol, .lyr li, .btn, .clock .time, .art { transition: none; }
+  body, .lyr ol, .lyr li, .btn, .art, .dev, .shot, .shot img, .shot video, .clk, .clk > *, .lines ol, .lines h3, .more { transition: none; }
 }
 </style>
 </head>
 <body>
+<canvas id="mesh" width="64" height="40" aria-hidden="true"></canvas>
 <div class="wrap">
   <header class="top">
     <a class="mark" href="#"><i aria-hidden="true"></i><span data-t="name">Сейчас играет</span></a>
@@ -237,26 +290,67 @@ footer a { color: var(--ink-2); }
   </div>
 </div>
 
-<section class="themes">
-  <div class="wrap">
-    <h2 data-t="themes_h">Так это выглядит на настоящем планшете</h2>
-    <p class="lead" data-t="themes_p">Пять видов экрана — выбираются в окне настроек на компьютере и сразу меняются на планшете. Фон — градиент, размытая обложка, видео из клипа или своё фото — подходит к любому виду.</p>
-    <div class="strip">
-      <figure><img src="img/classic.jpg" alt="" loading="lazy"><figcaption data-t="t1">Классика<span data-t="t1s">Обложка слева, текст справа</span></figcaption></figure>
-      <figure><img src="img/scene.jpg" alt="" loading="lazy"><figcaption data-t="t2">Сцена<span data-t="t2s">Обложка по центру</span></figcaption></figure>
-      <figure><img src="img/poster.jpg" alt="" loading="lazy"><figcaption data-t="t3">Постер<span data-t="t3s">Обложка во всю высоту</span></figcaption></figure>
-      <figure><img src="img/minimal.jpg" alt="" loading="lazy"><figcaption data-t="t4">Минимал<span data-t="t4s">Только типографика</span></figcaption></figure>
-      <figure><img src="img/vinyl.jpg" alt="" loading="lazy"><figcaption data-t="t5">Винил<span data-t="t5s">Пластинка крутится, пока играет</span></figcaption></figure>
+<!-- что умеет: слева экран устройства, справа возможности строками песни; прокрутка ведёт песню -->
+<section class="song" id="song">
+  <div class="wrap pin">
+    <div>
+      <div class="dev" id="dev">
+        <div class="shot">
+          <img src="img/classic.jpg" alt="" data-k="classic" class="show">
+          <img src="img/scene.jpg" alt="" data-k="scene" loading="lazy">
+          <img src="img/poster.jpg" alt="" data-k="poster" loading="lazy">
+          <img src="img/minimal.jpg" alt="" data-k="minimal" loading="lazy">
+          <video src="img/lyrics.mp4" poster="img/lyrics-poster.jpg" data-k="lyrics" data-seam="1" muted playsinline preload="none"></video>
+          <video src="img/video.mp4" poster="img/video-poster.jpg" data-k="video" loop muted playsinline preload="none"></video>
+          <video src="img/vinyl.mp4" poster="img/vinyl-poster.jpg" data-k="vinyl" loop muted playsinline preload="none"></video>
+          <video src="img/tv.mp4" poster="img/tv-poster.jpg" data-k="tv" data-seam="1" muted playsinline preload="none"></video>
+          <div class="clk" id="clk" aria-hidden="true">
+            <div class="ct" id="time">00:00</div>
+            <div class="cd" id="date"></div>
+            <div class="cw" data-t="wx">+3°  переменная облачность</div>
+          </div>
+        </div>
+      </div>
+      <p class="cap" id="cap" data-t="cap_tab">Galaxy Tab 3 Lite, 2014 год</p>
     </div>
-  </div>
-</section>
 
-<section class="clock" id="clock">
-  <div class="wrap">
-    <div class="time" id="time">00:00</div>
-    <div class="date" id="date"></div>
-    <div class="wx" data-t="wx">+3°  переменная облачность</div>
-    <p class="say" data-t="clock_p">Когда музыка на паузе, на экране часы, дата и погода. С 23 до 8 цифры становятся тёмно-красными — зайди ночью, увидишь.</p>
+    <div class="player">
+      <h2 data-t="song_h">Что умеет</h2>
+      <p class="by" data-t="song_by">Ночной маршрут, вид «Классика»</p>
+      <div class="lines"><ol id="lines">
+        <li data-k="classic" data-c="#7a2458,#4a1f52,#22142f">
+          <h3 data-t="l1">Цвета берутся из обложки</h3>
+          <div class="more"><div><p data-t="l1s">Фон собирается из главных цветов обложки и мягко светится в такт музыке. Эта страница делает так же.</p></div></div>
+        </li>
+        <li data-k="lyrics" data-c="#7a2458,#4a1f52,#22142f">
+          <h3 data-t="l2">Строка горит, когда её поют</h3>
+          <div class="more"><div><p data-t="l2s">Тексты находятся сами. Коснись строки на планшете — песня перемотается к ней. Здесь тоже можно.</p></div></div>
+        </li>
+        <li data-k="video" data-c="#3a2047,#21142f,#110b1c">
+          <h3 data-t="l7">Клип вместо фона</h3>
+          <div class="more"><div><p data-t="l7s">Если у трека есть видео, оно идёт за обложкой. Нет видео — фон из цветов обложки или размытая обложка.</p></div></div>
+        </li>
+        <li data-cycle="classic,scene,poster,minimal,vinyl" data-c="#6e2352,#3f1a4c,#1e1230">
+          <h3 data-t="l3">Пять видов экрана</h3>
+          <div class="more"><div><p data-t="l3s">Выбираются в окне настроек на компьютере, планшет переключается сразу.</p>
+            <div class="chips" id="chips"><span data-k="classic" data-t="v1">Классика</span><span data-k="scene" data-t="v2">Сцена</span><span data-k="poster" data-t="v3">Постер</span><span data-k="minimal" data-t="v4">Минимал</span><span data-k="vinyl" data-t="v5">Винил</span></div></div></div>
+        </li>
+        <li data-clock="1" data-c="#5a1f48,#341843,#1a1029">
+          <h3 data-t="l4">На паузе — часы</h3>
+          <div class="more"><div><p data-t="l4s">Время, дата и погода. Эти часы настоящие, они идут.</p></div></div>
+        </li>
+        <li data-clock="1" data-night="1" data-c="#000000,#000000,#000000">
+          <h3 data-t="l5">Ночью цифры краснеют</h3>
+          <div class="more"><div><p data-t="l5s">С 23 до 8 экран почти не светит и не мешает спать.</p></div></div>
+        </li>
+        <li data-k="tv" data-tv="1" data-c="#7a2458,#4a1f52,#22142f">
+          <h3 data-t="l6">И на телевизоре</h3>
+          <div class="more"><div><p data-t="l6s">Android TV: пульт ставит паузу, листает треки и меняет громкость на компьютере.</p></div></div>
+        </li>
+      </ol></div>
+      <div class="pbar"><i id="pbar"></i></div>
+      <div class="ptimes"><span id="ptl">0:00</span><span id="ptr">2:20</span></div>
+    </div>
   </div>
 </section>
 
@@ -318,12 +412,17 @@ const EN = {
   hint: 'This isn’t a picture: tap the screen to pause, swipe or use the arrow keys for another track.',
   screen_label: 'Sample screen. Tap to pause, arrow keys for another track',
   dl_win: 'Download for Windows', dl_apk: 'Android app', free: 'Free and open source.',
-  themes_h: 'This is how it looks on a real tablet',
-  themes_p: 'Five layouts — pick one in the settings window on your PC and the tablet switches at once. The background — gradient, blurred cover, music video or your own photo — works with any layout.',
-  t1: 'Classic', t1s: 'Cover left, lyrics right', t2: 'Scene', t2s: 'Cover in the middle', t3: 'Poster', t3s: 'Cover at full height',
-  t4: 'Minimal', t4s: 'Type only', t5: 'Vinyl', t5s: 'The record spins while music plays',
+  song_h: 'What it does', song_by: 'Night Route, Classic layout',
+  cap_tab: 'Galaxy Tab 3 Lite, from 2014', cap_tv: 'Android TV, same app',
+  l1: 'Colors come from the cover', l1s: 'The background is built from the cover’s main colors and glows softly to the beat. This page does the same.',
+  l2: 'A line lights up as it’s sung', l2s: 'Lyrics are found automatically. Tap a line on the tablet and the song jumps there. Works here too.',
+  l7: 'Music video as the background', l7s: 'If the track has a video, it plays behind the cover. No video — the background comes from the cover’s colors or a blurred cover.',
+  l3: 'Five layouts', l3s: 'Pick one in the settings window on your PC and the tablet switches at once.',
+  v1: 'Classic', v2: 'Scene', v3: 'Poster', v4: 'Minimal', v5: 'Vinyl',
+  l4: 'Paused? It’s a clock', l4s: 'Time, date and weather. This clock is real, it’s ticking.',
+  l5: 'At night the digits turn red', l5s: 'From 11 pm to 8 am the screen barely glows, so it won’t keep you up.',
+  l6: 'And on your TV', l6s: 'Android TV: the remote pauses, skips tracks and changes the volume on your PC.',
   wx: '+3°  partly cloudy',
-  clock_p: 'When the music is paused, the screen shows the time, date and weather. From 11 pm to 8 am the digits turn dark red — come back at night to see.',
   setup_h: 'How to set it up', need: 'You need Windows 10 or 11 and an Android 4.1+ tablet or phone on the same Wi‑Fi.',
   s1: 'Run the program on your PC', s1s: 'It lives in the tray, adds itself to startup and asks the firewall for permission.',
   s2: 'Install the app on the tablet', s2s: 'Copy the APK, or press “Install” in the settings window — over a cable or Wi‑Fi.',
@@ -334,6 +433,7 @@ const EN = {
 const RU = {};
 document.querySelectorAll('[data-t]').forEach(el => { RU[el.dataset.t] = el.innerHTML; });
 RU.screen_label = document.getElementById('screen').getAttribute('aria-label');
+RU.cap_tv = 'Android TV, то же приложение';
 let lang = 'ru', relTag = '';
 try { lang = localStorage.getItem('np-lang') || (navigator.language.startsWith('ru') ? 'ru' : 'en'); } catch (e) {}
 
@@ -341,7 +441,7 @@ try { lang = localStorage.getItem('np-lang') || (navigator.language.startsWith('
 const $ = id => document.getElementById(id);
 const arts = [...document.querySelectorAll('.art')];
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-let ti = 0, t = 0, playing = true, last = performance.now(), lineEls = [], shown = -1;
+let ti = 0, t = 0, playing = true, last = performance.now(), lineEls = [], shown = -1, inSong = false;
 
 function fmt(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 function dur() { return TRACKS[ti][lang].lines.length * LINE_SEC + 1.5; }
@@ -357,9 +457,13 @@ function loadTrack(i, keepTime) {
   lineEls = d.lines.map(text => { const li = document.createElement('li'); li.textContent = text; ol.appendChild(li); return li; });
   shown = -1;
   arts.forEach((a, k) => { a.style.opacity = k === tr.art ? 1 : 0; });
-  const s = document.body.style;
-  s.setProperty('--c1', tr.c[0]); s.setProperty('--c2', tr.c[1]); s.setProperty('--c3', tr.c[2]); s.setProperty('--glow', tr.glow);
+  if (!inSong) paint(tr.c, tr.glow);   // в разделе «Что умеет» цвет страницы ведёт он
   $('tr').textContent = fmt(dur());
+}
+function paint(c, glow) {
+  const s = document.body.style;
+  s.setProperty('--c1', c[0]); s.setProperty('--c2', c[1]); s.setProperty('--c3', c[2]);
+  if (glow) s.setProperty('--glow', glow);
 }
 
 function frame(now) {
@@ -425,6 +529,7 @@ function setLang(l) {
   loadTrack(ti, true);
   tick();
   showVer();
+  capText();
 }
 function showVer() { if (relTag) $('ver').textContent = (lang === 'en' ? 'Version ' : 'Версия ') + relTag; }
 $('lang').addEventListener('click', () => setLang(lang === 'en' ? 'ru' : 'en'));
@@ -435,9 +540,88 @@ function tick() {
   $('time').textContent = String(h).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   const date = d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
   $('date').textContent = date.charAt(0).toUpperCase() + date.slice(1);
-  $('clock').classList.toggle('is-night', h >= 23 || h < 8);
 }
 setInterval(tick, 10000);
+
+// ---------- «Что умеет»: прокрутка внутри раздела = время песни ----------
+const song = $('song'), dev = $('dev'), clk = $('clk');
+const items = [...document.querySelectorAll('#lines li')];
+const shots = [...document.querySelectorAll('.shot img, .shot video')];
+// видео: играет только то, что сейчас на экране; там, где петлю не сшить, — короткое затемнение на стыке
+shots.filter(v => v.dataset.seam).forEach(v => v.addEventListener('ended', () => {
+  v.classList.add('dip');
+  setTimeout(() => { v.currentTime = 0; v.play().catch(() => {}); v.classList.remove('dip'); }, 260);
+}));
+const SONG_SEC = 140, N = items.length;
+let cur = -1, cycleTimer = null;
+
+function showShot(k, zoom) {
+  shots.forEach(im => {
+    const on = im.dataset.k === k;
+    im.classList.toggle('show', on); im.classList.toggle('zoom', on && !!zoom);
+    if (im.tagName !== 'VIDEO') return;
+    if (on && !reduce) { im.preload = 'auto'; im.play().catch(() => {}); }
+    else if (!on) im.pause();
+  });
+}
+function markChip(k) { document.querySelectorAll('#chips span').forEach(s => s.classList.toggle('on', s.dataset.k === k)); }
+function capText() { const d = lang === 'en' ? EN : RU; $('cap').textContent = cur >= 0 && items[cur].dataset.tv ? d.cap_tv || RU.cap_tv : d.cap_tab; }
+
+function activate(i) {
+  if (i === cur) return;
+  cur = i;
+  items.forEach((li, k) => { li.className = k === i ? 'now' : (Math.abs(k - i) === 1 ? 'near' : ''); });
+  const d = items[i].dataset;
+  clearInterval(cycleTimer);
+  clk.classList.toggle('show', !!d.clock);
+  clk.classList.toggle('night', !!d.night);
+  if (d.clock) showShot(null);
+  else if (d.cycle) {
+    const ks = d.cycle.split(','); let n = 1;
+    showShot(ks[n]); markChip(ks[n]);
+    if (!reduce) cycleTimer = setInterval(() => { n = (n + 1) % ks.length; showShot(ks[n]); markChip(ks[n]); }, 1600);
+  } else showShot(d.k, d.zoom);
+  dev.classList.toggle('tv', !!d.tv);
+  document.body.classList.toggle('night', !!d.night);
+  capText();
+  centerLine();
+  if (inSong) paint(d.c.split(','));
+}
+// на телефоне строки в окошке: текущая держится на трети высоты, как текст на планшете
+function centerLine() {
+  const box = $('lines').parentElement, ol = $('lines');
+  const over = ol.scrollHeight > box.clientHeight + 2;
+  box.classList.toggle('clip', over);
+  if (cur < 0 || !over) { ol.style.transform = ''; return; }
+  const el = items[cur];
+  ol.style.transform = `translateY(${Math.min(0, box.clientHeight * .3 - el.offsetTop)}px)`;
+}
+function songRange() { return [song.offsetTop, song.offsetHeight - innerHeight]; }
+
+// строки — как кнопки: мышью, пальцем и с клавиатуры
+items.forEach((li, k) => {
+  li.tabIndex = 0; li.setAttribute('role', 'button');
+  const go = () => { const [top, len] = songRange(); scrollTo({ top: top + (k + .5) / N * len, behavior: reduce ? 'auto' : 'smooth' }); };
+  li.addEventListener('click', go);
+  li.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+});
+
+let ticking = false;
+function onScroll() {
+  ticking = false;
+  const [top, len] = songRange();
+  const p = Math.min(1, Math.max(0, (scrollY - top) / len));
+  const was = inSong;
+  inSong = scrollY > top - innerHeight * .5 && scrollY < top + len + innerHeight * .5;
+  activate(Math.min(N - 1, Math.floor(p * N)));
+  if (inSong && !was) paint(items[cur].dataset.c.split(','));
+  if (!inSong && was) { paint(TRACKS[ti].c, TRACKS[ti].glow); document.body.classList.remove('night'); }
+  if (inSong) document.body.classList.toggle('night', !!items[cur].dataset.night);
+  $('pbar').style.width = (p * 100) + '%';
+  $('ptl').textContent = fmt(p * SONG_SEC);
+}
+addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
+addEventListener('resize', () => { centerLine(); onScroll(); });
 
 // ---------- кнопки скачивания: файлы из последнего релиза ----------
 fetch('https://api.github.com/repos/nowplaylab/nowplaying-display/releases/latest')
@@ -454,7 +638,48 @@ fetch('https://api.github.com/repos/nowplaylab/nowplaying-display/releases/lates
   .catch(() => {});
 
 if (lang !== 'ru') setLang(lang); else { loadTrack(0); tick(); }
+onScroll();
 requestAnimationFrame(frame);
+
+// ---------- фон: градиент из точек — та же математика, что в шейдере «Point gradient» из Figma ----------
+// Настройки из макета: 3 точки, плавность 0.92, движение вкл., скорость 2, амплитуда 100%.
+// Цвета точек берутся из текущего трека (светлый, средний, тёмный), поэтому подкраска страницы сохраняется.
+(() => {
+  const cv = document.getElementById('mesh'), g = cv.getContext('2d');
+  const W = cv.width, H = cv.height, img = g.createImageData(W, H);
+  const cs = getComputedStyle(document.body);
+  const rgb = v => { const m = cs.getPropertyValue(v).trim().match(/[\d.]+/g); return m ? m.slice(0, 3).map(Number) : [0, 0, 0]; };
+  const BASE = [[21.89, -3.33], [90.48, 96.14], [16.23, 83.92]];   // места точек из Figma, в %
+  const SMOOTH = .92, SPEED = 2, AMP = 1;
+  const sharp = 32 + (1.25 - 32) * SMOOTH;
+  function moving(base, i, sec) {
+    const dir = [i % 2 === 1 ? -1 : 1, i >= 2 ? 1 : -1], per = [16 + i * .9, 19 - i * .8];
+    return base.map((b, k) => {
+      const st = Math.min(1, Math.max(0, b / 100)), ph = Math.asin(st * 2 - 1);
+      const pos = (.5 + .5 * Math.sin(ph + sec * SPEED * 2 * Math.PI * dir[k] / per[k])) * 100;
+      return (b + (pos - b) * AMP) / 100;
+    });
+  }
+  function draw(ms) {
+    const sec = ms / 1000;
+    const cols = [rgb('--c1').map(v => v + (255 - v) * .18), rgb('--c2'), rgb('--c3').map(v => v * .82)];
+    const pts = BASE.map((b, i) => moving(b, i, sec));
+    const mn = Math.min(innerWidth, innerHeight), mx = innerWidth / mn, my = innerHeight / mn;
+    const d = img.data; let o = 0;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const u = x / (W - 1), v = y / (H - 1), ds = [0, 0, 0];
+      let near = Infinity;
+      for (let k = 0; k < 3; k++) { const dx = (u - pts[k][0]) * mx, dy = (v - pts[k][1]) * my; ds[k] = dx * dx + dy * dy; if (ds[k] < near) near = ds[k]; }
+      let r = 0, gg = 0, b = 0, ws = 0;
+      for (let k = 0; k < 3; k++) { const w = Math.exp(-(ds[k] - near) * sharp); r += cols[k][0] * w; gg += cols[k][1] * w; b += cols[k][2] * w; ws += w; }
+      d[o++] = r / ws; d[o++] = gg / ws; d[o++] = b / ws; d[o++] = 255;
+    }
+    g.putImageData(img, 0, 0);
+  }
+  let last = -1e9;
+  function loop(t) { if (t - last > 33) { draw(t); last = t; } requestAnimationFrame(loop); }
+  if (reduce) { draw(0); setInterval(() => draw(0), 1600); } else requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
