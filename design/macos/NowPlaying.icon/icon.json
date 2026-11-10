@@ -1,0 +1,24 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.48627,0.41569,0.61961,1.00000",
+      "srgb:0.18431,0.20000,0.32157,1.00000"
+    ],
+    "orientation" : {
+      "start" : { "x" : 0.62, "y" : 0.0 },
+      "stop" : { "x" : 0.25, "y" : 1.0 }
+    }
+  },
+  "groups" : [
+    {
+      "layers" : [
+        { "glass" : true, "image-name" : "primary.svg", "name" : "Точка и строка" },
+        { "glass" : true, "image-name" : "secondary.svg", "name" : "Соседние строки" }
+      ],
+      "name" : "Знак",
+      "shadow" : { "kind" : "neutral", "opacity" : 0.5 },
+      "translucency" : { "enabled" : true, "value" : 0.4 }
+    }
+  ],
+  "supported-platforms" : { "squares" : [ "macOS" ] }
+}
