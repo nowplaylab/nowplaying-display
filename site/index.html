@@ -96,6 +96,11 @@ a:hover { text-decoration-color: var(--spot); }
   font: 700 19px/1.15 'Inter Display', sans-serif; letter-spacing: -.01em; color: #fff; min-height: 60px; transition: background-color .25s ease, color .25s ease; }
 .btn + .btn { border-top: 1px dashed var(--fold); }
 .btn[hidden] { display: none; }
+/* мелкая ссылка под строкой Mac: файл для Intel */
+.sub { display: block; padding: 0 16px 12px 16px; margin-top: -6px; font: 600 12px/1.3 'Inter Display', sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); text-decoration: none; }
+.sub:hover { color: var(--ink); text-decoration: underline; }
+.sub[hidden] { display: none; }
+.btn:not(.ghost) + .sub { background: var(--spot); color: #140d18; margin-top: 0; padding-top: 0; }
 .btn::before { content: attr(data-cat); grid-column: 1 / -1; font: 600 11px/1.3 'Inter Display', sans-serif; letter-spacing: .14em; text-transform: uppercase; opacity: .72; }
 .btn svg { width: 18px; height: 18px; flex: none; }
 .btn:not(.ghost) { background: var(--spot); color: #140d18; }
@@ -370,8 +375,9 @@ body.night .pbar i { background: var(--night); }
       <a class="btn" data-dl="exe" data-cat="NP-02 · Windows 10 / 11" href="https://github.com/nowplaylab/nowplaying-display/releases/latest">
         <span data-t="dl_win">Скачать для Windows</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zm0 13L10.5 19.6v-7H3zm8.5 1.3L21 21v-8.4h-9.5zm0-15.6v7.3H21V3z"/></svg></a>
-      <a class="btn ghost" data-dl="mac" data-cat="NP-02M · macOS" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_mac">Скачать для macOS</span>
+      <a class="btn ghost" data-dl="mac" data-cat="NP-02M · macOS · Apple Silicon" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_mac">Скачать для macOS</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-4ZM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4Z"/></svg></a>
+      <a class="sub" data-dl="macintel" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_intel">Mac на Intel</span> →</a>
       <a class="btn ghost" data-dl="linux" data-cat="NP-02L · Linux" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_linux">Скачать для Linux</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c-2.2 0-3.6 1.8-3.6 4.3 0 1.4.3 2.3-.6 3.6C6.6 11.6 5 13.8 5 16.4c0 .7.1 1.3.4 1.9-.9.4-1.9 1-1.9 1.8 0 1.3 2 1.2 3.4 1.9 1 .5 1.8.9 2.6.9 1 0 1.6-.6 2.5-.6s1.5.6 2.5.6c.8 0 1.6-.4 2.6-.9 1.4-.7 3.4-.6 3.4-1.9 0-.8-1-1.4-1.9-1.8.3-.6.4-1.2.4-1.9 0-2.6-1.6-4.8-2.8-6.5-.9-1.3-.6-2.2-.6-3.6C15.6 3.8 14.2 2 12 2Zm-1.6 4.1c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.3-1.1.8-1.1Zm3.2 0c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.3-1.1.8-1.1ZM12 9.3c.9 0 2 .6 2 1.1 0 .4-1 1.2-2 1.2s-2-.8-2-1.2c0-.5 1.1-1.1 2-1.1Zm0 3.6c2 0 3.4 1.6 3.4 3.8S14 20 12 20s-3.4-1.1-3.4-3.3 1.4-3.8 3.4-3.8Z"/></svg></a>
       <a class="btn ghost" data-dl="apk" data-cat="NP-02A · Android 4.1+ · TV" href="https://github.com/nowplaylab/nowplaying-display/releases/latest">
@@ -457,8 +463,9 @@ body.night .pbar i { background: var(--night); }
     <div class="release">
       <a class="btn" data-dl="exe" data-cat="NP-02 · Windows 10 / 11" href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_win">Скачать для Windows</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zm0 13L10.5 19.6v-7H3zm8.5 1.3L21 21v-8.4h-9.5zm0-15.6v7.3H21V3z"/></svg></a>
-      <a class="btn ghost" data-dl="mac" data-cat="NP-02M · macOS" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_mac">Скачать для macOS</span>
+      <a class="btn ghost" data-dl="mac" data-cat="NP-02M · macOS · Apple Silicon" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_mac">Скачать для macOS</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.6-4ZM14 5.4c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1 .1 2.1-.6 2.8-1.4Z"/></svg></a>
+      <a class="sub" data-dl="macintel" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_intel">Mac на Intel</span> →</a>
       <a class="btn ghost" data-dl="linux" data-cat="NP-02L · Linux" hidden href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_linux">Скачать для Linux</span>
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c-2.2 0-3.6 1.8-3.6 4.3 0 1.4.3 2.3-.6 3.6C6.6 11.6 5 13.8 5 16.4c0 .7.1 1.3.4 1.9-.9.4-1.9 1-1.9 1.8 0 1.3 2 1.2 3.4 1.9 1 .5 1.8.9 2.6.9 1 0 1.6-.6 2.5-.6s1.5.6 2.5.6c.8 0 1.6-.4 2.6-.9 1.4-.7 3.4-.6 3.4-1.9 0-.8-1-1.4-1.9-1.8.3-.6.4-1.2.4-1.9 0-2.6-1.6-4.8-2.8-6.5-.9-1.3-.6-2.2-.6-3.6C15.6 3.8 14.2 2 12 2Zm-1.6 4.1c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.3-1.1.8-1.1Zm3.2 0c.5 0 .8.5.8 1.1s-.3 1.1-.8 1.1-.8-.5-.8-1.1.3-1.1.8-1.1ZM12 9.3c.9 0 2 .6 2 1.1 0 .4-1 1.2-2 1.2s-2-.8-2-1.2c0-.5 1.1-1.1 2-1.1Zm0 3.6c2 0 3.4 1.6 3.4 3.8S14 20 12 20s-3.4-1.1-3.4-3.3 1.4-3.8 3.4-3.8Z"/></svg></a>
       <a class="btn ghost" data-dl="apk" data-cat="NP-02A · Android 4.1+ · TV" href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><span data-t="dl_apk">Приложение для Android</span>
@@ -521,7 +528,7 @@ const EN = {
   hint: 'Not a picture. Tap to pause, swipe or use the arrow keys for another track',
   spine_by: 'Kasseta — Night Route', on_screen: 'On screen',
   screen_label: 'Sample screen. Tap to pause, arrow keys for another track',
-  dl_win: 'Download for Windows', dl_apk: 'Android app', dl_mac: 'Download for macOS', dl_linux: 'Download for Linux', dl_src: 'For macOS and Linux', free: 'Free · MIT',
+  dl_win: 'Download for Windows', dl_apk: 'Android app', dl_mac: 'Download for macOS', dl_linux: 'Download for Linux', dl_src: 'For macOS and Linux', dl_intel: 'Intel Mac', free: 'Free · MIT',
   song_h: 'Side A: what it does', song_by: '7 tracks · shot on “Night Route”',
   cap_tab: 'Galaxy Tab 3 Lite, from 2014', cap_tv: 'Android TV, same app',
   l1: 'Colors come from the cover', l1s: 'The background is built from the cover’s main colors and glows softly to the beat. This page does the same.',
@@ -764,7 +771,8 @@ fetch('https://api.github.com/repos/nowplaylab/nowplaying-display/releases/lates
     const files = {
       exe: rel.assets.find(a => a.name === 'NowPlayingServer.exe'),
       apk: find(/^NowPlaying-.+\.apk$/),
-      mac: find(/\.(dmg|pkg)$/i) || find(/(mac|macos|osx|darwin).*\.(zip|tar\.gz)$/i),
+      mac: find(/mac.*arm64.*\.dmg$/i) || find(/\.(dmg|pkg)$/i) || find(/(mac|macos|osx|darwin).*\.(zip|tar\.gz)$/i),
+      macintel: find(/mac.*intel.*\.dmg$/i),
       linux: find(/\.(AppImage|deb|rpm)$/i) || find(/linux.*\.(zip|tar\.gz|tgz)$/i),
     };
     for (const k in files) document.querySelectorAll(`[data-dl="${k}"]`).forEach(a => {
@@ -772,12 +780,14 @@ fetch('https://api.github.com/repos/nowplaylab/nowplaying-display/releases/lates
       a.href = files[k].browser_download_url;
       a.hidden = false;
     });
+    if (!files.mac || (files.macintel && files.macintel === files.mac)) document.querySelectorAll('[data-dl="macintel"]').forEach(x => { x.hidden = true; });
     avail.mac = !!files.mac; avail.linux = !!files.linux;
     if (avail.mac && avail.linux) document.querySelectorAll('[data-dl="src"]').forEach(x => { x.hidden = true; });
     if (myOS && myOS !== 'exe' && files[myOS]) document.querySelectorAll('.release').forEach(box => {
       box.querySelector('[data-dl="exe"]').classList.add('ghost');
       const mine = box.querySelector(`[data-dl="${myOS}"]`);
       mine.classList.remove('ghost'); box.prepend(mine);
+      const intel = box.querySelector('[data-dl="macintel"]'); if (myOS === 'mac' && intel) mine.after(intel);
     });
     relTag = rel.tag_name.replace(/^v/, '');
     showVer();
