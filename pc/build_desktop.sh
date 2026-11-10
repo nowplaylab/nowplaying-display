@@ -82,9 +82,10 @@ Darwin)
     fi
     rm -f "$ROOT/release/$OUT_NAME.dmg"
     mkdir dmg-src && cp -R "$APP" dmg-src/
+    # высота окна 432 = фон 400 + заголовок окна Finder (32 pt), иначе низ фона обрезается
     # create-dmg расставляет иконки через Finder; на сервере GitHub без экрана это иногда падает — тогда простой .dmg
-    create-dmg --volname "NowPlaying" --volicon icon.icns $BG --window-size 660 400 --icon-size 96 \
-        --icon NowPlaying.app 120 290 --app-drop-link 120 95 --hide-extension NowPlaying.app \
+    create-dmg --volname "NowPlaying" --volicon icon.icns $BG --window-size 660 432 --icon-size 96 --text-size 12 \
+        --icon NowPlaying.app 120 285 --app-drop-link 120 84 --hide-extension NowPlaying.app \
         --no-internet-enable "$ROOT/release/$OUT_NAME.dmg" dmg-src \
         || { echo "create-dmg не справился, делаю простой .dmg" >&2
              rm -f "$ROOT/release/$OUT_NAME.dmg"; ln -s /Applications dmg-src/Applications
