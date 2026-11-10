@@ -12,15 +12,7 @@ cp "$SRC"/*.py "$SRC/icon.png" "$SRC/icon.ico" "$B/"
 cp -r "$SRC/settings_ui" "$B/"
 # секрет приложения Яндекса (pc/yandex_secret.py, не в git) кладём в сборку не открытым текстом
 if [ -f "$B/yandex_secret.py" ]; then
-    "$PY" - "$B/yandex_secret.py" <<'PYEOF'
-import base64, re, sys
-p = sys.argv[1]
-s = re.search(r"SECRET\s*=\s*'([^']*)'", open(p, encoding='utf-8').read()).group(1)
-if not s.startswith('x:'):
-    x = bytes(c ^ ((0x5A + i * 29) & 0xFF) for i, c in enumerate(s.encode()))
-    s = 'x:' + base64.b64encode(x).decode()
-open(p, 'w', encoding='utf-8').write(f"SECRET = '{s}'\n")
-PYEOF
+    "$PY" "$SRC/../tools/hide_secret.py" "$B/yandex_secret.py"
 else
     echo "ВНИМАНИЕ: нет pc/yandex_secret.py — вход в Яндекс (подсветка) в этой сборке работать не будет" >&2
 fi

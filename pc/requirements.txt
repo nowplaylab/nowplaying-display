@@ -6,7 +6,7 @@ winrt-Windows.Foundation==3.2.1; sys_platform == "win32"
 winrt-Windows.Foundation.Collections==3.2.1; sys_platform == "win32"
 winrt-Windows.Media.Control==3.2.1; sys_platform == "win32"
 winrt-Windows.Storage.Streams==3.2.1; sys_platform == "win32"
-pystray==0.19.5; sys_platform == "win32"
+pystray==0.19.5
 imageio-ffmpeg==0.6.0
 pycaw==20260927; sys_platform == "win32"
 psutil==7.2.2
