@@ -1,0 +1,173 @@
+name: Mac and Linux builds
+
+# Собирает NowPlaying Server для macOS (.dmg) и Linux (.AppImage).
+# - Запуск вручную без версии (или пуш в ветку desktop-builds) — только проверка: файлы в Artifacts прогона.
+# - Запуск вручную с версией (например 2.9) — собирает из коммита черновика v2.9 и докладывает файлы
+#   в этот черновик, дописывая их хэши в SHA256SUMS.txt. tools/make-draft.sh запускает это сам.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия черновика (например 2.9). Пусто — только собрать и проверить"
+        required: false
+        default: ""
+  push:
+    branches: [desktop-builds]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-builds-${{ inputs.version || github.ref }}
+
+jobs:
+  prepare:
+    name: Which commit
+    runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - id: ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.version }}
+        run: |
+          if [ -z "$V" ]; then echo "ref=$GITHUB_SHA" >> "$GITHUB_OUTPUT"; exit 0; fi
+          # черновик ещё без тега — берём коммит, на который он указывает
+          SHA=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+                --jq ".[] | select(.tag_name == \"v$V\") | .target_commitish" | head -1)
+          [ -n "$SHA" ] || { echo "нет релиза v$V"; exit 1; }
+          echo "ref=$SHA" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.name }}
+    needs: prepare
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-26
+            file: NowPlayingServer-mac-arm64
+            optional: false
+          - name: macOS Intel
+            os: macos-15-intel
+            file: NowPlayingServer-mac-intel
+            optional: true
+          - name: Linux
+            os: ubuntu-22.04      # старый glibc: AppImage запустится и на дистрибутивах постарше
+            file: NowPlayingServer-linux-x86_64
+            optional: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install -q -r pc/requirements.txt pyinstaller==6.22.3
+          if [ "$RUNNER_OS" = macOS ]; then brew install create-dmg; fi
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -q && sudo apt-get install -yq libpulse0 xvfb
+            curl -fsSL -o /usr/local/bin/appimagetool \
+              https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+            chmod +x /usr/local/bin/appimagetool
+          fi
+      - name: Yandex secret (if set)
+        env:
+          YANDEX_SECRET: ${{ secrets.YANDEX_SECRET }}
+        run: |
+          if [ -n "$YANDEX_SECRET" ]; then
+            python -c "import os; open('pc/yandex_secret.py','w').write('SECRET = %r\n' % os.environ['YANDEX_SECRET'])"
+          fi
+      - name: Build
+        run: |
+          # иконку нового формата (NowPlaying.icon) собирает только actool из Xcode 26+
+          if [ "$RUNNER_OS" = macOS ]; then
+            X=$(ls -d /Applications/Xcode_2[6-9]*.app 2>/dev/null | sort -V | tail -1)
+            [ -n "$X" ] && export DEVELOPER_DIR="$X/Contents/Developer" && echo "Xcode: $X"
+          fi
+          PYTHON=python BUILD_DIR="$RUNNER_TEMP/np" sh pc/build_desktop.sh "${{ matrix.file }}"
+      - name: Smoke test
+        run: |
+          export NP_HTTP_PORT=47811 NP_UDP_PORT=47812 LOCALAPPDATA="$RUNNER_TEMP/la" NP_MENU_SELFTEST=1
+          if [ "$RUNNER_OS" = macOS ]; then
+            BIN="$RUNNER_TEMP/np/dist/NowPlaying.app/Contents/MacOS/NowPlaying"
+            # помощник mediaremote-adapter должен лежать там, где его ищет media_mac.py
+            find "$RUNNER_TEMP/np/dist/NowPlaying.app" -name mediaremote-adapter.pl | grep -q . || { echo "нет помощника pc/mac"; exit 1; }
+            "$BIN" & PID=$!
+          else
+            chmod +x "release/${{ matrix.file }}.AppImage"
+            APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a "release/${{ matrix.file }}.AppImage" & PID=$!
+          fi
+          ok=""
+          for i in $(seq 1 60); do
+            if curl -fs "http://127.0.0.1:47811/health" >/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          curl -fs -H "X-NowPlaying: 1" "http://127.0.0.1:47811/api/settings" >/dev/null || ok=""
+          # программа должна жить дальше, а на маке — показать значок в строке меню
+          sleep 10
+          alive=""; kill -0 $PID 2>/dev/null && alive=1
+          tray=""; grep -q "tray icon shown" "$LOCALAPPDATA/NowPlaying/server.log" 2>/dev/null && tray=1
+          kill $PID 2>/dev/null || true
+          pkill -f NowPlaying 2>/dev/null || true
+          cat "$LOCALAPPDATA/NowPlaying/server.log" 2>/dev/null | tail -30 || true
+          cat "$LOCALAPPDATA/NowPlaying/crash.log" 2>/dev/null | tail -40 || true
+          [ -n "$ok" ] || { echo "сервер не ответил"; exit 1; }
+          [ -n "$alive" ] || { echo "программа упала после запуска"; exit 1; }
+          if [ "$RUNNER_OS" = macOS ] && [ -z "$tray" ]; then echo "значок в строке меню не появился"; exit 1; fi
+          if [ "$RUNNER_OS" = macOS ] && ! grep -q "menu selftest" "$LOCALAPPDATA/NowPlaying/server.log"; then echo "меню не собралось"; exit 1; fi
+          echo "сервер отвечает, программа работает"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}
+          path: release/${{ matrix.file }}.*
+          if-no-files-found: error
+
+  attach:
+    name: Add to draft v${{ inputs.version }}
+    needs: build
+    if: ${{ always() && inputs.version != '' && needs.build.result != 'cancelled' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Upload to the draft and update SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ inputs.version }}
+        run: |
+          set -eu
+          ls -l files
+          [ -f files/NowPlayingServer-mac-arm64.dmg ] && [ -f files/NowPlayingServer-linux-x86_64.AppImage ] \
+            || { echo "главные сборки не готовы — черновик не трогаю"; exit 1; }
+          ID=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"v$V\" and .draft) | .id" | head -1)
+          [ -n "$ID" ] || { echo "нет черновика v$V (опубликованные не трогаю)"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/releases/$ID/assets" --jq '.[] | "\(.id) \(.name)"' > assets.txt
+          SUMS_ID=$(awk '$2 == "SHA256SUMS.txt" {print $1}' assets.txt)
+          [ -n "$SUMS_ID" ] || { echo "в черновике нет SHA256SUMS.txt"; exit 1; }
+          gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$SUMS_ID" > SHA256SUMS.txt
+          cd files
+          for f in *; do
+            # старую копию этого файла (если была) заменяем
+            OLD=$(awk -v n="$f" '$2 == n {print $1}' ../assets.txt)
+            [ -n "$OLD" ] && gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$OLD"
+            grep -v "  $f\$" ../SHA256SUMS.txt > ../s.tmp || true; mv ../s.tmp ../SHA256SUMS.txt
+            sha256sum "$f" >> ../SHA256SUMS.txt
+            curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" \
+              --data-binary @"$f" "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=$f" >/dev/null
+            echo "added $f"
+          done
+          cd ..
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$SUMS_ID"
+          curl -fsS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: text/plain" \
+            --data-binary @SHA256SUMS.txt "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$ID/assets?name=SHA256SUMS.txt" >/dev/null
+          cat SHA256SUMS.txt
+          echo "Draft **v$V**: added $(ls files | tr '\n' ' ')" >> "$GITHUB_STEP_SUMMARY"

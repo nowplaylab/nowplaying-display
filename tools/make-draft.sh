@@ -2,6 +2,7 @@
 # Черновик релиза в очередь на ежедневный выпуск (.github/workflows/daily-release.yml публикует
 # самый младший черновик новее latest раз в день).
 #   sh tools/make-draft.sh <версия> <полный sha коммита> <файл с описанием.md> [версия APK]
+# Сборки для Mac и Linux запускаются в конце сами (на GitHub).
 # Перед этим: собрать exe (pc/build_exe.sh -> release/NowPlayingServer.exe) и APK (android/build.sh),
 # запустить exe на тестовом порту и убедиться, что он стартует.
 # Токен GitHub берётся из Git Credential Manager (тот же вход, что для git push).
@@ -24,3 +25,8 @@ for f in NowPlayingServer.exe "NowPlaying-$AV.apk" SHA256SUMS.txt; do
     | python -c "import json,sys;r=json.load(sys.stdin);print(r.get('name'),r.get('size'),r.get('state'))"
 done
 echo "draft $V id=$ID"
+# сборки для Mac и Linux делает GitHub (.github/workflows/desktop-builds.yml) из коммита черновика
+# и сам докладывает их в черновик, дописывая хэши в SHA256SUMS.txt (около 10 минут)
+curl -s -X POST -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" \
+  $R/actions/workflows/desktop-builds.yml/dispatches -d "{\"ref\":\"main\",\"inputs\":{\"version\":\"$V\"}}" \
+  && echo "Mac/Linux: сборка запущена, смотри вкладку Actions"

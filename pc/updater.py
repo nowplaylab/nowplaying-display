@@ -87,7 +87,8 @@ class Updater:
                     log.info('update: app for tablet %s downloaded', apk_ver)
 
         newer = version_tuple(tag) > version_tuple(self.version)
-        if newer and getattr(sys, 'frozen', False) and 'NowPlayingServer.exe' in sums and not self.exe:
+        # exe меняем только на Windows; сборки для Mac и Linux пока обновляются вручную
+        if newer and sys.platform == 'win32' and getattr(sys, 'frozen', False) and 'NowPlayingServer.exe' in sums and not self.exe:
             path = await self.download(http, assets['NowPlayingServer.exe'], f'NowPlayingServer-{tag}.exe',
                                        sums['NowPlayingServer.exe'])
             if path:
