@@ -162,8 +162,35 @@ def tray_image():
     return Image.open(resource('icon.png'))
 
 
+def control(action):
+    """Пауза / следующий трек — через свой же сервер (он знает, каким плеером управлять)."""
+    def go():
+        try:
+            urllib.request.urlopen(f'http://127.0.0.1:{server.HTTP_PORT}/api/control/{action}', timeout=4).read()
+        except OSError as e:
+            log.warning('control %s: %s', action, e)
+    threading.Thread(target=go, daemon=True).start()
+
+
+def run_menubar_mac(srv, log_path):
+    """Своё меню на AppKit (pc/menubar_mac.py). False — если не вышло, тогда запасной pystray."""
+    try:
+        import menubar_mac
+    except Exception as e:
+        log.warning('mac menu unavailable: %s', e)
+        return False
+    ctx = {'srv': srv, 'open_settings': open_settings, 'open_path': open_path, 'log_path': log_path,
+           'autostart': autostart_enabled, 'set_autostart': set_autostart, 'can_autostart': FROZEN,
+           'local_ip': local_ip}
+    log.info('starting tray')
+    menubar_mac.run(ctx, resource(MENUBAR_GLYPH), MENUBAR_SIZE)
+    return True
+
+
 def run_tray(srv, log_path, first_run):
     """Значок с меню. Возвращает False, если показать его негде."""
+    if IS_MAC and run_menubar_mac(srv, log_path):
+        return True
     try:
         import pystray
     except Exception as e:
@@ -174,16 +201,22 @@ def run_tray(srv, log_path, first_run):
         srv.stop()
         icon.stop()
 
+    # тот же порядок, что в меню Mac, но без шапки с обложкой (pystray умеет только текст)
+    playing = lambda item: bool(server.state.get('track_id'))   # noqa: E731
     menu = pystray.Menu(
         pystray.MenuItem(lambda item: now_playing_text(), None, enabled=False),
-        pystray.MenuItem(lambda item: f'Адрес для планшета: {local_ip()}:{server.HTTP_PORT}', None, enabled=False),
+        pystray.MenuItem(lambda item: 'Пауза' if server.state.get('playing') else 'Играть',
+                         lambda icon, item: control('toggle'), visible=playing),
+        pystray.MenuItem('Следующий трек', lambda icon, item: control('next'), visible=playing),
+        pystray.Menu.SEPARATOR,
+        pystray.MenuItem(lambda item: f'Адрес для экранов: {local_ip()}:{server.HTTP_PORT}', None, enabled=False),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem('Настройки…', lambda icon, item: open_settings(), default=True),
-        pystray.MenuItem('Запускать при входе в систему', lambda icon, item: set_autostart(not autostart_enabled()),
+        pystray.MenuItem('Запускать при входе', lambda icon, item: set_autostart(not autostart_enabled()),
                          checked=lambda item: autostart_enabled(), visible=FROZEN),
-        pystray.MenuItem('Открыть журнал', lambda icon, item: log_path and open_path(log_path)),
+        pystray.MenuItem('Журнал', lambda icon, item: log_path and open_path(log_path)),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem(f'Версия {server.VERSION}', None, enabled=False),
+        pystray.MenuItem(f'NowPlaying {server.VERSION}', None, enabled=False),
         pystray.MenuItem('Выход', quit_app),
     )
     try:

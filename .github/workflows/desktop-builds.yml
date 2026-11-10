@@ -94,7 +94,7 @@ jobs:
           PYTHON=python BUILD_DIR="$RUNNER_TEMP/np" sh pc/build_desktop.sh "${{ matrix.file }}"
       - name: Smoke test
         run: |
-          export NP_HTTP_PORT=47811 NP_UDP_PORT=47812 LOCALAPPDATA="$RUNNER_TEMP/la"
+          export NP_HTTP_PORT=47811 NP_UDP_PORT=47812 LOCALAPPDATA="$RUNNER_TEMP/la" NP_MENU_SELFTEST=1
           if [ "$RUNNER_OS" = macOS ]; then
             BIN="$RUNNER_TEMP/np/dist/NowPlaying.app/Contents/MacOS/NowPlaying"
             # помощник mediaremote-adapter должен лежать там, где его ищет media_mac.py
@@ -121,6 +121,7 @@ jobs:
           [ -n "$ok" ] || { echo "сервер не ответил"; exit 1; }
           [ -n "$alive" ] || { echo "программа упала после запуска"; exit 1; }
           if [ "$RUNNER_OS" = macOS ] && [ -z "$tray" ]; then echo "значок в строке меню не появился"; exit 1; fi
+          if [ "$RUNNER_OS" = macOS ] && ! grep -q "menu selftest" "$LOCALAPPDATA/NowPlaying/server.log"; then echo "меню не собралось"; exit 1; fi
           echo "сервер отвечает, программа работает"
       - uses: actions/upload-artifact@v4
         with:
