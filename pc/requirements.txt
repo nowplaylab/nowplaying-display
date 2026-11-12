@@ -16,6 +16,6 @@ recurring-ical-events==3.8.2
 soundcard==0.4.6
 numpy==2.5.4
 dbus-next==0.2.3; sys_platform == "linux"
-yeelight-lan @ git+https://github.com/nowplaylab/yeelight-lan@v0.2.2
-yandex-smarthome @ git+https://github.com/nowplaylab/yandex-smarthome@v0.1.0
+yeelight-lan==0.2.2
+yandex-smarthome==0.1.0
 lrclib-synced==0.3.0
