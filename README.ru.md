@@ -1,6 +1,22 @@
-# NowPlaying — экран «Сейчас играет» для старого планшета
+<a href="https://nowplaylab.github.io/nowplaying-display/"><img src="https://raw.githubusercontent.com/nowplaylab/.github/main/profile/nowplaying.png" alt="NowPlaying: Windows, Android 4.1+, Android TV. Open source, MIT" width="100%"></a>
 
-[English](README.md) | **Русский** | [Сайт](https://nowplaylab.github.io/nowplaying-display/)
+<p align="center"><a href="README.md">English</a> &nbsp;·&nbsp; <b>Русский</b> &nbsp;·&nbsp; <a href="https://nowplaylab.github.io/nowplaying-display/">Сайт</a></p>
+
+<h3 align="center">Экран «Сейчас играет» для старого планшета</h3>
+<p align="center"><sub>Обложка, синхронный текст и видео из клипа с компьютера на планшете из ящика.</sub></p>
+
+<p align="center">
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/badge/Сервер_для_Windows-772556?style=for-the-badge&logo=windows&logoColor=white" alt="Сервер для Windows"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/badge/Приложение_Android-55507F?style=for-the-badge&logo=android&logoColor=white" alt="Приложение Android"></a>
+<a href="https://nowplaylab.github.io/nowplaying-display/"><img src="https://img.shields.io/badge/Сайт-3B3C61?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Сайт"></a>
+</p>
+
+<p align="center">
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/github/v/release/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=772556&label=версия" alt="version"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/stargazers"><img src="https://img.shields.io/github/stars/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=55507F&label=звёзды" alt="stars"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/releases"><img src="https://img.shields.io/github/downloads/nowplaylab/nowplaying-display/total?style=flat-square&labelColor=3B3C61&color=55507F&label=скачивания" alt="downloads"></a>
+<a href="LICENSE"><img src="https://img.shields.io/github/license/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=8B85A7" alt="license"></a>
+</p>
 
 <p align="center"><img src="docs/screenshots/demo.gif" width="560" alt="NowPlaying на Galaxy Tab 3 Lite: экран трека, видео из клипа, темы и часы"></p>
 
@@ -11,19 +27,27 @@
 - фон-градиент из цветов обложки или зацикленное видео из клипа, если у трека есть видеошот или клип в Яндекс Музыке;
 - большие часы, когда музыка не играет.
 
-<p align="center"><img src="docs/screenshots/icon.png" width="120" alt="Иконка NowPlaying"></p>
+## Виды экрана
 
-![Экран с треком: обложка, исполнитель и синхронный текст](docs/screenshots/player.png)
-
-| Часы, когда музыка не играет | Часы с фоном (фото, гифка или видео) |
-|---|---|
-| ![Часы](docs/screenshots/clock.png) | ![Часы с фоном](docs/screenshots/clock-background.png) |
+<table>
+<tr>
+<td align="center" width="33%"><img src="design/themes-now/classic.png" alt="Классика"><br><sub>Классика</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/scene.png" alt="Сцена"><br><sub>Сцена</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/poster.png" alt="Постер"><br><sub>Постер</sub></td>
+</tr>
+<tr>
+<td align="center" width="33%"><img src="design/themes-now/minimal.png" alt="Минимал"><br><sub>Минимал</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/vinyl.png" alt="Винил"><br><sub>Винил</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/clock-background.png" alt="Часы с фоном"><br><sub>Часы с фоном</sub></td>
+</tr>
+</table>
 
 *Скриншоты сняты с Galaxy Tab 3 Lite (1024×600).*
 
 Работает с любым плеером, который показывается в панели Windows «Сейчас играет»: Яндекс Музыка, Spotify, музыка в браузере и т. д. VLC тоже поддерживается: в эту панель он не попадает, поэтому сервер сам включает в VLC встроенный веб-интерфейс (только для этого компьютера, со случайным паролем) — после первого запуска VLC нужно один раз перезапустить. Ролики короче 45 секунд, TikTok и YouTube Shorts не показываются.
 
-**Подсветка в цвет обложки.** Лампы и ленты из Умного дома Яндекса могут менять цвет вместе с треком: окно настроек → «Подсветка» → «Подключить Яндекс» (вход по коду на странице Яндекса, пароль программа не видит). Подходит любая цветная лампа, подключённая к Алисе, в том числе Xiaomi и Yeelight. Лампы только с белым светом подстраивают оттенок: тёплая обложка — тёплый свет, холодная — холодный. Цвет меняется один раз на трек: Яндекс управляет лампами через интернет, под бит так не успеть. Подробнее — [docs/lamp.md](docs/lamp.md).
+> [!TIP]
+> **Подсветка в цвет обложки.** Лампы и ленты из Умного дома Яндекса могут менять цвет вместе с треком: окно настроек → «Подсветка» → «Подключить Яндекс» (вход по коду на странице Яндекса, пароль программа не видит). Подходит любая цветная лампа, подключённая к Алисе, в том числе Xiaomi и Yeelight. Лампы только с белым светом подстраивают оттенок: тёплая обложка — тёплый свет, холодная — холодный. Цвет меняется один раз на трек: Яндекс управляет лампами через интернет, под бит так не успеть. Подробнее — [docs/lamp.md](docs/lamp.md).
 
 ```
 Плеер на ПК ──► панель Windows «Сейчас играет» ──► сервер на ПК ──Wi-Fi──► приложение на планшете
@@ -55,7 +79,8 @@
 
 Windows SmartScreen может предупредить, что программа неизвестна: она не подписана сертификатом разработчика. Нажмите «Подробнее» → «Выполнить в любом случае».
 
-Меню значка (правая кнопка мыши):
+<details>
+<summary><b>Меню значка (правая кнопка мыши)</b></summary>
 
 | Пункт | Что делает |
 |---|---|
@@ -68,6 +93,8 @@ Windows SmartScreen может предупредить, что программ
 | Обновить до … | поставить скачанное обновление сейчас |
 | Выход | остановить сервер |
 
+</details>
+
 ### 2. Приложение на планшете
 
 Скопируйте файл `.apk` на планшет и установите. В настройках планшета для этого нужно разрешить установку из неизвестных источников.
@@ -77,6 +104,9 @@ Windows SmartScreen может предупредить, что программ
 ### Окно настроек
 
 Кликни по значку в трее (или «Настройки…» в его меню) — откроется окно настроек. Всё применяется на планшете сразу:
+
+<details>
+<summary><b>Все настройки</b></summary>
 
 - **Экран трека:** вид экрана (Классика; Сцена — обложка по центру и строка текста под ней; Постер — обложка во всю высоту экрана; Минимал — без обложки, крупный текст; Винил — пластинка крутится, выезжая из конверта-обложки); что за обложкой — видео из клипа, градиент из обложки, сильно размытая обложка (её же можно выбрать запасным фоном, если у трека нет видео), один цвет или своё фото/видео для всех песен; затемнение фона; мягкое свечение за обложкой, которое «дышит» в такт музыке (сервер слушает уровень звука ПК); тень под обложкой.
 - **Часы:** своё фото, гифка или видео, его затемнение, часы ночного режима, когда гасить экран.
@@ -91,6 +121,8 @@ Windows SmartScreen может предупредить, что программ
 - **Включение компьютера (Wake on LAN):** когда ПК выключен, на часах появляется кнопка «Включить компьютер». Работает, если ПК подключён к роутеру кабелем, а пробуждение по сети разрешено в BIOS и в настройках электропитания сетевой карты.
 - **Планшет:** на связи ли он, и установка приложения через adb по USB или Wi-Fi. Если adb на компьютере нет, окно предложит скачать официальные platform-tools от Google (около 7 МБ).
 - **Программа:** автообновление.
+
+</details>
 
 Менять настройки можно только на этом компьютере.
 
@@ -113,7 +145,8 @@ Windows SmartScreen может предупредить, что программ
 | Тап по строке, пока текст пролистан | перемотать песню на эту строку (для синхронного текста) |
 | Тянуть или тапнуть полоску прогресса | перемотать песню |
 
-Как ещё ведёт себя приложение:
+<details>
+<summary><b>Как ещё ведёт себя приложение</b></summary>
 
 - **Экран не гаснет**, приложение показывается поверх экрана блокировки и **запускается само** после включения планшета.
 - **Когда музыка на паузе больше минуты**, показываются часы. Раз в минуту они немного сдвигаются, чтобы не выжигать экран.
@@ -123,7 +156,32 @@ Windows SmartScreen может предупредить, что программ
 - **Через 30 минут без музыки** экран становится чёрным. Тап будит его на минуту, новая музыка будит сразу.
 - **Если нашёлся только обычный текст** без таймингов, под исполнителем написано «текст без синхронизации».
 
-## Запуск сервера из исходников
+</details>
+
+## macOS и Linux
+
+На странице [релиза](https://github.com/nowplaylab/nowplaying-display/releases/latest) лежат готовые программы:
+
+- **macOS:** `NowPlayingServer-mac-arm64.dmg` (Apple Silicon, M1 и новее) или `NowPlayingServer-mac-intel.dmg` (Intel). Откройте .dmg и перетащите NowPlaying в «Программы». Программа без подписи Apple, поэтому при первом запуске macOS её не откроет: зайдите в «Системные настройки → Конфиденциальность и безопасность» и нажмите «Всё равно открыть». Значок появится в строке меню, рядом с часами. Что играет, берётся из системной панели «Сейчас играет»: **Яндекс Музыка, браузеры, Spotify, Apple Music, VLC**, всё, что видно в Пункте управления (через [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, лежит в `pc/mac`).
+- **Linux (x86_64):** `NowPlayingServer-linux-x86_64.AppImage`. Сделайте файл исполняемым (`chmod +x`, или в свойствах файла) и запустите. Значок появится в трее, если рабочий стол его показывает (в GNOME нужно расширение AppIndicator). Без значка сервер тоже работает, а повторный запуск открывает окно настроек. Что играет, берётся через MPRIS: его поддерживают Spotify, браузеры, VLC и почти все плееры. Громкость — через `pactl` (PulseAudio/PipeWire).
+
+При первом запуске программа добавляет себя в автозапуск (выключается в меню значка) и открывает окно настроек. Настройки и журнал лежат в папке `~/NowPlaying`.
+
+Можно и из исходников: `tools/NowPlaying-mac.command` на Mac (сам скачает Python, если нужно) или `sh tools/nowplaying-linux.sh` на Linux (нужны `python3` и `python3-venv`). Собрать программу самому: `sh pc/build_desktop.sh <имя>` на той системе, под которую собираете.
+
+На обеих системах не работают автообновление программы и установка приложения через adb из окна настроек. «Дыхание» и визуализатор на Mac работают, только если поставить программу захвата звука (например, BlackHole).
+
+## Если что-то не работает
+
+- **Планшет не находит ПК.** Проверьте, что значок сервера есть в трее, а в его меню нет пункта «Разрешить в брандмауэре…». Убедитесь, что планшет и ПК в одной сети и роутер не изолирует Wi-Fi-клиентов друг от друга. Можно ввести адрес вручную долгим нажатием.
+- **Нет текста песни.** Тексты берутся из открытой базы [LRCLIB](https://lrclib.net). Синхронный текст подставляется, только если длительность трека совпала (±4 с). Если в LRCLIB ничего нет, обычный текст (без синхронизации) берётся из Яндекс Музыки. Для редких треков текста может не быть. Текст и видео ищутся по исполнителю и названию, поэтому работают одинаково для любого плеера, в том числе Spotify и Apple Music.
+- **Обложка мутная.** Сначала показывается маленькая обложка из Windows, затем сервер ищет чёткую в iTunes (600 px) и Deezer (1000 px). Чёткая подставляется, только если совпали название и хотя бы один исполнитель.
+- **Музыка не появляется.** Проверьте, показывается ли трек в панели Windows «Сейчас играет» (значок громкости в трее). Если там его нет, сервер его тоже не видит.
+
+## Для разработчиков
+
+<details>
+<summary><b>Запуск сервера из исходников</b></summary>
 
 Нужен Python 3.10+. В папке `pc`:
 
@@ -137,20 +195,10 @@ python -m venv .venv
 
 Чтобы собрать свой `NowPlayingServer.exe`, поставьте PyInstaller (`.venv\Scripts\python -m pip install pyinstaller`) и выполните `sh pc/build_exe.sh` в Git Bash. Результат появится в `release/`.
 
-### macOS и Linux
+</details>
 
-На странице [релиза](https://github.com/nowplaylab/nowplaying-display/releases/latest) лежат готовые программы:
-
-- **macOS:** `NowPlayingServer-mac-arm64.dmg` (Apple Silicon, M1 и новее) или `NowPlayingServer-mac-intel.dmg` (Intel). Откройте .dmg и перетащите NowPlaying в «Программы». Программа без подписи Apple, поэтому при первом запуске macOS её не откроет: зайдите в «Системные настройки → Конфиденциальность и безопасность» и нажмите «Всё равно открыть». Значок появится в строке меню, рядом с часами. Что играет, берётся из системной панели «Сейчас играет»: **Яндекс Музыка, браузеры, Spotify, Apple Music, VLC**, всё, что видно в Пункте управления (через [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, лежит в `pc/mac`).
-- **Linux (x86_64):** `NowPlayingServer-linux-x86_64.AppImage`. Сделайте файл исполняемым (`chmod +x`, или в свойствах файла) и запустите. Значок появится в трее, если рабочий стол его показывает (в GNOME нужно расширение AppIndicator). Без значка сервер тоже работает, а повторный запуск открывает окно настроек. Что играет, берётся через MPRIS: его поддерживают Spotify, браузеры, VLC и почти все плееры. Громкость — через `pactl` (PulseAudio/PipeWire).
-
-При первом запуске программа добавляет себя в автозапуск (выключается в меню значка) и открывает окно настроек. Настройки и журнал лежат в папке `~/NowPlaying`.
-
-Можно и из исходников: `tools/NowPlaying-mac.command` на Mac (сам скачает Python, если нужно) или `sh tools/nowplaying-linux.sh` на Linux (нужны `python3` и `python3-venv`). Собрать программу самому: `sh pc/build_desktop.sh <имя>` на той системе, под которую собираете.
-
-На обеих системах не работают автообновление программы и установка приложения через adb из окна настроек. «Дыхание» и визуализатор на Mac работают, только если поставить программу захвата звука (например, BlackHole).
-
-## Сборка приложения
+<details>
+<summary><b>Сборка приложения</b></summary>
 
 Приложение собирается без Gradle и Android Studio, скриптом `android/build.sh`. Он рассчитан на Windows и запускается из Git Bash.
 
@@ -169,14 +217,10 @@ ANDROID_SDK=/c/android-sdk sh android/build.sh
 
 При первой сборке рядом с SDK создаётся ключ подписи `nowplaying.keystore`, а другой можно указать переменной `KEYSTORE`. **Сохраните этот ключ**: без него новую версию не получится поставить поверх старой, придётся удалять приложение. В репозиторий ключ не попадает.
 
-## Если что-то не работает
+</details>
 
-- **Планшет не находит ПК.** Проверьте, что значок сервера есть в трее, а в его меню нет пункта «Разрешить в брандмауэре…». Убедитесь, что планшет и ПК в одной сети и роутер не изолирует Wi-Fi-клиентов друг от друга. Можно ввести адрес вручную долгим нажатием.
-- **Нет текста песни.** Тексты берутся из открытой базы [LRCLIB](https://lrclib.net). Синхронный текст подставляется, только если длительность трека совпала (±4 с). Если в LRCLIB ничего нет, обычный текст (без синхронизации) берётся из Яндекс Музыки. Для редких треков текста может не быть. Текст и видео ищутся по исполнителю и названию, поэтому работают одинаково для любого плеера, в том числе Spotify и Apple Music.
-- **Обложка мутная.** Сначала показывается маленькая обложка из Windows, затем сервер ищет чёткую в iTunes (600 px) и Deezer (1000 px). Чёткая подставляется, только если совпали название и хотя бы один исполнитель.
-- **Музыка не появляется.** Проверьте, показывается ли трек в панели Windows «Сейчас играет» (значок громкости в трее). Если там его нет, сервер его тоже не видит.
-
-## Для разработчиков
+<details>
+<summary><b>API сервера, порты и шрифты</b></summary>
 
 Сервер (`pc/server.py`) написан на Python: aiohttp, winrt, Pillow. Данные хранит только в памяти. Значок в трее, автозапуск (задание Планировщика «при входе в систему», запасной вариант — раздел реестра `Run` текущего пользователя) и правила брандмауэра реализованы в `pc/nowplaying_app.py` на pystray.
 
@@ -194,17 +238,25 @@ ANDROID_SDK=/c/android-sdk sh android/build.sh
 
 Приложение (`android/`) написано на Java: minSdk 16, targetSdk 17, без сторонних библиотек. Шрифт — [Inter 4.1](https://github.com/rsms/inter) (SIL Open Font License, `android/assets/fonts/LICENSE-Inter.txt`): Inter Display Bold для названия и текста песни, Inter Display SemiBold для часов, Inter Medium для остального. Файлы урезаны до латиницы и кириллицы. Он похож на SF Pro из Apple Music, а SF Pro встраивать в Android-приложения лицензия Apple не разрешает.
 
+</details>
+
 ## Поддержать проект
 
 NowPlaying бесплатный. Если он вам пригодился, можно поддержать разработку:
 
-- [DonationAlerts](https://www.donationalerts.com/r/tryshyzov)
-- USDT, только сеть TRON (TRC20): `TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc` ([QR](https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc))
+<p>
+<a href="https://www.donationalerts.com/r/tryshyzov"><img src="https://img.shields.io/badge/DonationAlerts-772556?style=for-the-badge&logoColor=white" alt="DonationAlerts"></a>
+<a href="https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc"><img src="https://img.shields.io/badge/USDT_TRC20-55507F?style=for-the-badge&logo=tether&logoColor=white" alt="USDT TRC20"></a>
+</p>
+
+USDT, только сеть TRON (TRC20):
+
+```
+TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc
+```
 
 ## Лицензия
 
 [MIT](LICENSE)
-
-Иконка — фан-арт с Clawd, персонажем Claude Code. Персонаж принадлежит Anthropic, и лицензия MIT на него не распространяется: она касается только кода проекта. Проект не связан с Anthropic.
 
 `NowPlayingServer.exe` содержит FFmpeg 7.1 из пакета [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) 0.6.0 (сборка [imageio-binaries](https://github.com/imageio/imageio-binaries)), с его помощью готовится видео для фона. FFmpeg распространяется по лицензии GNU GPL, а не MIT. Исходный код: [ffmpeg-7.1.tar.xz](https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz), подробнее на [ffmpeg.org/legal.html](https://ffmpeg.org/legal.html).

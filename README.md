@@ -1,6 +1,22 @@
-# NowPlaying — a "Now Playing" screen for an old tablet
+<a href="https://nowplaylab.github.io/nowplaying-display/"><img src="https://raw.githubusercontent.com/nowplaylab/.github/main/profile/nowplaying.png" alt="NowPlaying: Windows, Android 4.1+, Android TV. Open source, MIT" width="100%"></a>
 
-**English** | [Русский](README.ru.md) | [Website](https://nowplaylab.github.io/nowplaying-display/)
+<p align="center"><b>English</b> &nbsp;·&nbsp; <a href="README.ru.md">Русский</a> &nbsp;·&nbsp; <a href="https://nowplaylab.github.io/nowplaying-display/">Website</a></p>
+
+<h3 align="center">A "Now Playing" screen for an old tablet</h3>
+<p align="center"><sub>Cover, synced lyrics and a music-video background from your PC, on the tablet from the drawer.</sub></p>
+
+<p align="center">
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/badge/Windows_server-772556?style=for-the-badge&logo=windows&logoColor=white" alt="Windows server"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/badge/Android_app-55507F?style=for-the-badge&logo=android&logoColor=white" alt="Android app"></a>
+<a href="https://nowplaylab.github.io/nowplaying-display/"><img src="https://img.shields.io/badge/Website-3B3C61?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website"></a>
+</p>
+
+<p align="center">
+<a href="https://github.com/nowplaylab/nowplaying-display/releases/latest"><img src="https://img.shields.io/github/v/release/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=772556&label=version" alt="version"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/stargazers"><img src="https://img.shields.io/github/stars/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=55507F&label=stars" alt="stars"></a>
+<a href="https://github.com/nowplaylab/nowplaying-display/releases"><img src="https://img.shields.io/github/downloads/nowplaylab/nowplaying-display/total?style=flat-square&labelColor=3B3C61&color=55507F&label=downloads" alt="downloads"></a>
+<a href="LICENSE"><img src="https://img.shields.io/github/license/nowplaylab/nowplaying-display?style=flat-square&labelColor=3B3C61&color=8B85A7" alt="license"></a>
+</p>
 
 <p align="center"><img src="docs/screenshots/demo.gif" width="560" alt="NowPlaying on a Galaxy Tab 3 Lite: track screen, music video, layouts and the clock"></p>
 
@@ -11,19 +27,27 @@ Turns an old Android tablet (tested on a Samsung Galaxy Tab 3 Lite, Android 4.2)
 - a gradient background made from the cover's colors, or a looping video from the music video if Yandex Music has a video shot or a music video for the track;
 - a big clock when nothing is playing.
 
-<p align="center"><img src="docs/screenshots/icon.png" width="120" alt="NowPlaying icon"></p>
+## Layouts
 
-![Track screen: cover, artist and synced lyrics](docs/screenshots/player.png)
-
-| Clock when nothing is playing | Clock with a background (photo, GIF or video) |
-|---|---|
-| ![Clock](docs/screenshots/clock.png) | ![Clock with a background](docs/screenshots/clock-background.png) |
+<table>
+<tr>
+<td align="center" width="33%"><img src="design/themes-now/classic.png" alt="Classic"><br><sub>Classic</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/scene.png" alt="Scene"><br><sub>Scene</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/poster.png" alt="Poster"><br><sub>Poster</sub></td>
+</tr>
+<tr>
+<td align="center" width="33%"><img src="design/themes-now/minimal.png" alt="Minimal"><br><sub>Minimal</sub></td>
+<td align="center" width="33%"><img src="design/themes-now/vinyl.png" alt="Vinyl"><br><sub>Vinyl</sub></td>
+<td align="center" width="33%"><img src="docs/screenshots/clock-background.png" alt="Clock with a background"><br><sub>Clock with a background</sub></td>
+</tr>
+</table>
 
 *Screenshots taken on a Galaxy Tab 3 Lite (1024×600).*
 
 Works with any player that shows up in the Windows media overlay (the "Now Playing" panel): Yandex Music, Spotify, music in a browser and so on. VLC is supported too: it does not show up in that panel, so the server turns on VLC's built-in web interface (local only, with a random password) — restart VLC once after the first launch. Clips shorter than 45 seconds, TikTok and YouTube Shorts are ignored.
 
-**Lighting that follows the cover.** Lamps and light strips from Yandex Smart Home can change colour with the track: settings window → Lighting → Connect Yandex (you sign in with a code on Yandex's page; the program never sees your password). Any colour lamp linked to Alice works, including Xiaomi and Yeelight. White-only lamps shift their shade instead: a warm cover gives warm light, a cool one gives cool light. The colour changes once per track: Yandex controls lamps over the internet, which is too slow to follow the beat. More in [docs/lamp.md](docs/lamp.md) (in Russian).
+> [!TIP]
+> **Lighting that follows the cover.** Lamps and light strips from Yandex Smart Home can change colour with the track: settings window → Lighting → Connect Yandex (you sign in with a code on Yandex's page; the program never sees your password). Any colour lamp linked to Alice works, including Xiaomi and Yeelight. White-only lamps shift their shade instead: a warm cover gives warm light, a cool one gives cool light. The colour changes once per track: Yandex controls lamps over the internet, which is too slow to follow the beat. More in [docs/lamp.md](docs/lamp.md) (in Russian).
 
 ```
 Player on the PC ──► Windows media overlay ──► server on the PC ──Wi-Fi──► app on the tablet
@@ -31,7 +55,8 @@ Player on the PC ──► Windows media overlay ──► server on the PC ─�
                                     covers: iTunes, Deezer · lyrics: LRCLIB, Yandex Music · video: Yandex Music
 ```
 
-> **Note:** the app and the tray program are in Russian. The guide below gives each Russian label with an English translation.
+> [!NOTE]
+> The app and the tray program are in Russian. The guide below gives each Russian label with an English translation.
 
 ## Requirements
 
@@ -57,7 +82,8 @@ Download two files from the [latest release](../../releases/latest):
 
 Windows SmartScreen may warn that the program is unrecognized, because it isn't signed with a developer certificate. Click "More info" → "Run anyway".
 
-Tray menu (right-click the icon):
+<details>
+<summary><b>Tray menu (right-click the icon)</b></summary>
 
 | Item | What it does |
 |---|---|
@@ -70,6 +96,8 @@ Tray menu (right-click the icon):
 | Обновить до … (update to …) | install a downloaded update now |
 | Выход (exit) | stop the server |
 
+</details>
+
 ### 2. App on the tablet
 
 Copy the `.apk` file to the tablet and install it. You'll need to allow installs from unknown sources in the tablet settings.
@@ -79,6 +107,9 @@ Open the «Сейчас играет» ("Now Playing") app. It **finds the PC on
 ### Settings window
 
 Click the tray icon (or «Настройки…» in its menu) to open the settings window. Everything applies to the tablet right away:
+
+<details>
+<summary><b>All settings</b></summary>
 
 - **Track screen:** the layout (Classic, Scene — cover in the middle with a line of lyrics under it, Poster — cover at full screen height, Minimal — no cover, large type, Vinyl — a spinning record sliding out of the cover sleeve); what's behind the cover — video from the music video, a gradient from the cover, a heavily blurred cover (also usable as the fallback when a track has no video), a single color, or your own photo/video for all songs; background dimming; a soft glow behind the cover that pulses with the music (the server listens to the PC's output level); cover shadow.
 - **Clock:** your own photo, GIF or video, its dimming, night mode hours, when to turn the screen off.
@@ -93,6 +124,8 @@ Click the tray icon (or «Настройки…» in its menu) to open the setti
 - **Wake on LAN:** when the PC is off, the clock shows a «Включить компьютер» (turn on the computer) button. It works when the PC is connected to the router by cable and waking from the network is allowed in the BIOS and in the network card's power settings.
 - **Tablet:** is it online, and installing the app over adb by USB or Wi-Fi. If adb isn't installed, the window offers to download Google's official platform-tools (about 7 MB).
 - **Program:** automatic updates.
+
+</details>
 
 Settings can only be changed on this PC.
 
@@ -115,7 +148,8 @@ Every 6 hours the server checks the [latest release](../../releases/latest) on G
 | Tap a line while the lyrics are scrolled | jump to that line (synced lyrics only) |
 | Drag or tap the progress bar | seek |
 
-Other things the app does:
+<details>
+<summary><b>Other things the app does</b></summary>
 
 - **The screen stays on**, the app shows on top of the lock screen and **starts automatically** when the tablet boots.
 - **When music is paused for more than a minute**, a clock appears. Once a minute it moves to a new spot to avoid screen burn-in.
@@ -125,7 +159,32 @@ Other things the app does:
 - **After 30 minutes without music** the screen goes black. A tap wakes it for a minute, new music wakes it right away.
 - **If only plain lyrics were found** (no timings), the app shows «текст без синхронизации» ("lyrics not synced") under the artist.
 
-## Running the server from source
+</details>
+
+## macOS and Linux
+
+Ready-made programs are on the [release page](https://github.com/nowplaylab/nowplaying-display/releases/latest):
+
+- **macOS:** `NowPlayingServer-mac-arm64.dmg` (Apple Silicon, M1 and later) or `NowPlayingServer-mac-intel.dmg` (Intel). Open the .dmg and drag NowPlaying to Applications. The program is not signed by Apple, so macOS refuses to open it the first time: go to System Settings → Privacy & Security and click Open Anyway. The icon appears in the menu bar, next to the clock. Tracks come from the system Now Playing panel: **Yandex Music, browsers, Spotify, Apple Music, VLC**, anything shown in Control Center (via [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, bundled in `pc/mac`).
+- **Linux (x86_64):** `NowPlayingServer-linux-x86_64.AppImage`. Make the file executable (`chmod +x`, or in the file's properties) and run it. The icon appears in the tray if your desktop shows one (GNOME needs the AppIndicator extension). Without the icon the server still runs, and launching the program again opens the settings window. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
+
+On the first run the program adds itself to autostart (you can turn this off in the icon menu) and opens the settings window. Settings and the log live in `~/NowPlaying`.
+
+You can also run it from source: `tools/NowPlaying-mac.command` on a Mac (it downloads Python if needed) or `sh tools/nowplaying-linux.sh` on Linux (needs `python3` and `python3-venv`). To build the program yourself, run `sh pc/build_desktop.sh <name>` on the system you are building for.
+
+On both systems the program does not update itself and cannot install the app over adb from the settings window. The glow and the visualizer work on a Mac only with an audio capture driver such as BlackHole.
+
+## Troubleshooting
+
+- **The tablet can't find the PC.** Check that the server icon is in the tray and that its menu doesn't show «Разрешить в брандмауэре…» (allow in firewall). Make sure the tablet and the PC are on the same network and the router doesn't isolate Wi-Fi clients from each other. You can also enter the address manually with a long press.
+- **No lyrics.** Lyrics come from the open [LRCLIB](https://lrclib.net) database. Synced lyrics are used only if the track length matches (±4 s). If LRCLIB has nothing, plain lyrics (without timing) are taken from Yandex Music. Rare tracks may have no lyrics at all. Lyrics and video are looked up by artist and title, so they work the same for every player, Spotify and Apple Music included.
+- **Blurry cover.** A small cover from Windows is shown first, then the server looks for a sharp one on iTunes (600 px) and Deezer (1000 px). The sharp one is used only if the title and at least one artist match.
+- **Music doesn't show up.** Check whether the track appears in the Windows media overlay (the volume flyout in the tray). If it isn't there, the server can't see it either.
+
+## For developers
+
+<details>
+<summary><b>Running the server from source</b></summary>
 
 You need Python 3.10+. In the `pc` folder:
 
@@ -139,20 +198,10 @@ python -m venv .venv
 
 To build your own `NowPlayingServer.exe`, install PyInstaller (`.venv\Scripts\python -m pip install pyinstaller`) and run `sh pc/build_exe.sh` in Git Bash. The result goes to `release/`.
 
-### macOS and Linux
+</details>
 
-Ready-made programs are on the [release page](https://github.com/nowplaylab/nowplaying-display/releases/latest):
-
-- **macOS:** `NowPlayingServer-mac-arm64.dmg` (Apple Silicon, M1 and later) or `NowPlayingServer-mac-intel.dmg` (Intel). Open the .dmg and drag NowPlaying to Applications. The program is not signed by Apple, so macOS refuses to open it the first time: go to System Settings → Privacy & Security and click Open Anyway. The icon appears in the menu bar, next to the clock. Tracks come from the system Now Playing panel: **Yandex Music, browsers, Spotify, Apple Music, VLC**, anything shown in Control Center (via [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter), BSD-3, bundled in `pc/mac`).
-- **Linux (x86_64):** `NowPlayingServer-linux-x86_64.AppImage`. Make the file executable (`chmod +x`, or in the file's properties) and run it. The icon appears in the tray if your desktop shows one (GNOME needs the AppIndicator extension). Without the icon the server still runs, and launching the program again opens the settings window. Tracks come through MPRIS, which Spotify, browsers, VLC and most players support. Volume goes through `pactl` (PulseAudio/PipeWire).
-
-On the first run the program adds itself to autostart (you can turn this off in the icon menu) and opens the settings window. Settings and the log live in `~/NowPlaying`.
-
-You can also run it from source: `tools/NowPlaying-mac.command` on a Mac (it downloads Python if needed) or `sh tools/nowplaying-linux.sh` on Linux (needs `python3` and `python3-venv`). To build the program yourself, run `sh pc/build_desktop.sh <name>` on the system you are building for.
-
-On both systems the program does not update itself and cannot install the app over adb from the settings window. The glow and the visualizer work on a Mac only with an audio capture driver such as BlackHole.
-
-## Building the app
+<details>
+<summary><b>Building the app</b></summary>
 
 The app is built without Gradle or Android Studio, using `android/build.sh`. The script is meant for Windows and runs in Git Bash.
 
@@ -171,14 +220,10 @@ The finished file appears at `android/NowPlaying.apk`.
 
 On the first build a signing key, `nowplaying.keystore`, is created next to the SDK; you can point to a different one with `KEYSTORE`. **Keep this key**: without it a new version can't be installed over the old one, and you'd have to uninstall the app first. The key is never added to the repository.
 
-## Troubleshooting
+</details>
 
-- **The tablet can't find the PC.** Check that the server icon is in the tray and that its menu doesn't show «Разрешить в брандмауэре…» (allow in firewall). Make sure the tablet and the PC are on the same network and the router doesn't isolate Wi-Fi clients from each other. You can also enter the address manually with a long press.
-- **No lyrics.** Lyrics come from the open [LRCLIB](https://lrclib.net) database. Synced lyrics are used only if the track length matches (±4 s). If LRCLIB has nothing, plain lyrics (without timing) are taken from Yandex Music. Rare tracks may have no lyrics at all. Lyrics and video are looked up by artist and title, so they work the same for every player, Spotify and Apple Music included.
-- **Blurry cover.** A small cover from Windows is shown first, then the server looks for a sharp one on iTunes (600 px) and Deezer (1000 px). The sharp one is used only if the title and at least one artist match.
-- **Music doesn't show up.** Check whether the track appears in the Windows media overlay (the volume flyout in the tray). If it isn't there, the server can't see it either.
-
-## For developers
+<details>
+<summary><b>Server API, ports and fonts</b></summary>
 
 The server (`pc/server.py`) is written in Python with aiohttp, winrt and Pillow. It keeps all data in memory only. The tray icon, autostart (a Task Scheduler "at log on" task, with the current user's `Run` registry key as a fallback) and firewall rules live in `pc/nowplaying_app.py`, built on pystray.
 
@@ -196,17 +241,25 @@ The server (`pc/server.py`) is written in Python with aiohttp, winrt and Pillow.
 
 The app (`android/`) is written in Java: minSdk 16, targetSdk 17, no third-party libraries. The font is [Inter 4.1](https://github.com/rsms/inter) (SIL Open Font License, `android/assets/fonts/LICENSE-Inter.txt`): Inter Display Bold for the title and lyrics, Inter Display SemiBold for the clock, Inter Medium for everything else. The files are subset to Latin and Cyrillic. It looks similar to SF Pro from Apple Music, whose license doesn't allow embedding it in Android apps.
 
+</details>
+
 ## Support the project
 
 NowPlaying is free. If it is useful to you, you can support development:
 
-- [DonationAlerts](https://www.donationalerts.com/r/tryshyzov)
-- USDT, TRON network (TRC20) only: `TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc` ([QR](https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc))
+<p>
+<a href="https://www.donationalerts.com/r/tryshyzov"><img src="https://img.shields.io/badge/DonationAlerts-772556?style=for-the-badge&logoColor=white" alt="DonationAlerts"></a>
+<a href="https://qr.crypt.bot/?url=TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc"><img src="https://img.shields.io/badge/USDT_TRC20-55507F?style=for-the-badge&logo=tether&logoColor=white" alt="USDT TRC20"></a>
+</p>
+
+USDT, TRON network (TRC20) only:
+
+```
+TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc
+```
 
 ## License
 
 [MIT](LICENSE)
-
-The icon is fan art of Clawd, the Claude Code character. The character belongs to Anthropic, and the MIT license does not cover it: it applies only to the project's code. This project is not affiliated with Anthropic.
 
 `NowPlayingServer.exe` includes FFmpeg 7.1 from the [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) 0.6.0 package (an [imageio-binaries](https://github.com/imageio/imageio-binaries) build), used to prepare background videos. FFmpeg is distributed under the GNU GPL, not MIT. Source code: [ffmpeg-7.1.tar.xz](https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz); see also [ffmpeg.org/legal.html](https://ffmpeg.org/legal.html).
