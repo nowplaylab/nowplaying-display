@@ -356,10 +356,21 @@ def want_lyrics(tid, dur, wait=True):
     return not meta['complete'] and meta['tries'] < 4 and now - meta['at'] > 15 * meta['tries']
 
 
-async def fetch_lyrics(app, tid, title, artist, album, dur):
-    """Текст через synced_lyrics: LRCLIB (синхронный — только если длительность совпала), запасной — Яндекс."""
+def lyrics_dir():
+    """Папка со своими текстами: «Исполнитель - Название.lrc» (или .txt) — берутся раньше интернета."""
+    path = os.path.join(os.path.dirname(SETTINGS.path), 'lyrics')
     try:
-        got = await synced_lyrics.fetch(app['http'], title, artist, album, dur)
+        os.makedirs(path, exist_ok=True)
+    except OSError:
+        pass
+    return path
+
+
+async def fetch_lyrics(app, tid, title, artist, album, dur):
+    """Текст через synced_lyrics: свои файлы из lyrics_dir(), потом LRCLIB (синхронный — только если
+    длительность совпала), запасной — Яндекс."""
+    try:
+        got = await synced_lyrics.fetch(app['http'], title, artist, album, dur, local_dirs=[lyrics_dir()])
     except Exception as e:      # библиотека сама глушит сеть; это на всякий случай
         log.warning('lyrics: %s', e)
         got = synced_lyrics.Lyrics(complete=False)
