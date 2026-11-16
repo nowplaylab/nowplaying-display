@@ -147,6 +147,7 @@ public class Screen extends android.view.ContextThemeWrapper {
     // последнее состояние с ПК
     private String trackId;
     private int artRev = -1;
+    private long lyricsRevision;
     private long shownSecond = -2, shownDuration = -1;
     private volatile boolean playing;   // читается и потоком «дыхания»
     private long position, duration, receivedAt, pausedSince;
@@ -375,6 +376,8 @@ public class Screen extends android.view.ContextThemeWrapper {
                     showTimerPanel();
                     return true;
                 }
+                if (player.getVisibility() == View.VISIBLE && inside(lyrics, e)
+                        && lyrics.openAttributionAtRaw(e.getRawX(), e.getRawY())) return true;
                 if (player.getVisibility() == View.VISIBLE && lyrics.isBrowsing() && inside(lyrics, e)) {
                     // текст пролистан — тап по строке перематывает на неё
                     long t = lyrics.timeAt(e.getRawY() - screenY(lyrics));
@@ -2119,7 +2122,7 @@ public class Screen extends android.view.ContextThemeWrapper {
                     timeLeft.setText(duration > 0 ? fmt(p) : "");
                     timeRight.setText(duration > 0 ? fmt(duration) : "");
                 }
-                lyrics.setPosition(p, duration);
+                lyrics.setPosition(p, duration, playing);
             }
             long t = SystemClock.elapsedRealtime();
             boolean idleNow = !connected || trackId == null
@@ -2457,7 +2460,9 @@ public class Screen extends android.view.ContextThemeWrapper {
                     pcLost = true;
                     if (failures % 5 == 0) {          // попробуем найти ПК заново (мог смениться IP)
                         String found = discover();
-                        if (found != null) server = found;
+                        // Другой порт — другой сервер (например, старая рабочая версия рядом
+                        // с проверяемой). При потере связи не переключаемся на него незаметно.
+                        if (found != null && s.equals(server) && sameServerPort(s, found)) server = found;
                     }
                 }
             }
@@ -2467,6 +2472,13 @@ public class Screen extends android.view.ContextThemeWrapper {
 
     private void setStatus(final String text) {
         ui.post(new Runnable() { public void run() { status.setText(text); } });
+    }
+
+    private static boolean sameServerPort(String a, String b) {
+        int ai = a.lastIndexOf(':'), bi = b.lastIndexOf(':');
+        String ap = ai < 0 ? "47801" : a.substring(ai + 1);
+        String bp = bi < 0 ? "47801" : b.substring(bi + 1);
+        return ap.equals(bp);
     }
 
     private static void sleep(long ms) {
@@ -2638,6 +2650,7 @@ public class Screen extends android.view.ContextThemeWrapper {
 
         if (id != null && !id.equals(trackId)) {
             trackId = id;
+            lyricsRevision = j.optLong("lyrics_rev", 0);
             title.setText(j.optString("title"));
             String a = j.optString("artist");
             artist.setText(a);
@@ -2655,6 +2668,11 @@ public class Screen extends android.view.ContextThemeWrapper {
         } else {
             // цвет приходит чуть позже обложки — обновим, если поменялся
             animateBackground(j);
+            long revision = j.optLong("lyrics_rev", 0);
+            if (revision != lyricsRevision) {
+                lyricsRevision = revision;
+                loadTrackExtras(server, id);
+            }
         }
         int rev = j.optInt("art_rev", 0);
         if (id != null && j.optBoolean("has_art") && rev != artRev) {
@@ -2740,6 +2758,7 @@ public class Screen extends android.view.ContextThemeWrapper {
     }
 
     private void loadTrackExtras(final String srv, final String id) {
+        final long requestedRevision = lyricsRevision;
         pool.execute(new Runnable() {
             public void run() {
                 // текст песни
@@ -2749,6 +2768,8 @@ public class Screen extends android.view.ContextThemeWrapper {
                         if (l.optBoolean("pending")) { sleep(2000); continue; }
                         final List<Long> t = new ArrayList<Long>();
                         final List<String> lines = new ArrayList<String>();
+                        final List<List<LyricsView.Word>> wordLines = new ArrayList<List<LyricsView.Word>>();
+                        final String credits = lyricsCredits(l.optJSONObject("attribution"));
                         JSONArray synced = l.optJSONArray("synced");
                         boolean isSynced = synced != null && synced.length() > 0;
                         if (isSynced) {
@@ -2756,6 +2777,17 @@ public class Screen extends android.view.ContextThemeWrapper {
                                 JSONObject o = synced.getJSONObject(k);
                                 t.add(o.getLong("t"));
                                 lines.add(o.optString("text"));
+                                List<LyricsView.Word> wordLine = new ArrayList<LyricsView.Word>();
+                                JSONArray ws = o.optJSONArray("words");
+                                for (int m = 0; ws != null && m < ws.length(); m++) {
+                                    JSONObject word = ws.getJSONObject(m);
+                                    long start = word.optLong("t", -1), end = word.optLong("end", -1);
+                                    int from = word.optInt("start", -1), to = word.optInt("stop", -1);
+                                    if (start >= 0 && end >= start && from >= 0 && to > from
+                                            && to <= o.optString("text").length())
+                                        wordLine.add(new LyricsView.Word(start, end, from, to));
+                                }
+                                wordLines.add(wordLine);
                             }
                         } else {
                             for (String s : l.optString("plain").split("\n")) lines.add(s.trim());
@@ -2764,9 +2796,12 @@ public class Screen extends android.view.ContextThemeWrapper {
                         final boolean fs = isSynced;
                         ui.post(new Runnable() {
                             public void run() {
-                                if (!id.equals(trackId)) return;
+                                if (!id.equals(trackId) || requestedRevision != lyricsRevision) return;
                                 lyrics.setLyrics(fs ? t : null, lines, fs);
+                                lyrics.setWords(wordLines);
+                                lyrics.setAttribution(android.text.Html.fromHtml(credits));
                                 lyrics.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
+                                unsynced.setText("текст без синхронизации");
                                 unsynced.setVisibility(!fs && !lines.isEmpty() ? View.VISIBLE : View.GONE);
                                 growLyrics(!lines.isEmpty(), true);
                             }
@@ -2781,6 +2816,21 @@ public class Screen extends android.view.ContextThemeWrapper {
     }
 
     /** Тонкая полоска прогресса. */
+    private static String lyricsCredits(JSONObject credits) {
+        if (credits == null) return "";
+        String text = android.text.TextUtils.htmlEncode(credits.optString("provider"));
+        for (String role : new String[]{"uploader", "maker"}) {
+            JSONObject person = credits.optJSONObject(role);
+            if (person == null) continue;
+            String url = person.optString("url");
+            String name = android.text.TextUtils.htmlEncode(person.optString("name"));
+            if (!url.startsWith("https://spicylyrics.org/")) continue;
+            text += " · " + (role.equals("maker") ? "синхронизация: " : "загрузил: ")
+                    + "<a href=\"" + android.text.TextUtils.htmlEncode(url) + "\">" + name + "</a>";
+        }
+        return text;
+    }
+
     static class ProgressLine extends View {
         private final Paint back = new Paint(Paint.ANTI_ALIAS_FLAG), front = new Paint(Paint.ANTI_ALIAS_FLAG);
         private float fraction;

@@ -260,3 +260,9 @@ TK787wDdmME8J6cpgLgqiaoV1EB6NK37hc
 [MIT](LICENSE)
 
 `NowPlayingServer.exe` содержит FFmpeg 7.1 из пакета [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) 0.6.0 (сборка [imageio-binaries](https://github.com/imageio/imageio-binaries)), с его помощью готовится видео для фона. FFmpeg распространяется по лицензии GNU GPL, а не MIT. Исходный код: [ffmpeg-7.1.tar.xz](https://ffmpeg.org/releases/ffmpeg-7.1.tar.xz), подробнее на [ffmpeg.org/legal.html](https://ffmpeg.org/legal.html).
+
+### Spicy Lyrics (2.6)
+
+Spicy Lyrics включён сразу с публичным клиентским ключом NowPlaying. Свои файлы имеют приоритет, запасные источники — LRCLIB и Яндекс. При наличии точных таймингов текущая строка заполняется по словам и слогам. Источник и авторы указаны мелким текстом в конце прокрутки. Секретный ключ в сборку не включён, поля для ключа в настройках NowPlaying нет.
+
+Отдельная библиотека `lrclib-synced` 0.4.0 принимает свой ключ через `spicy_key`; ключ NowPlaying в неё не встроен. Библиотека публикуется на PyPI отдельно от NowPlaying.

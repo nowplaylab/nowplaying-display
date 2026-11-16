@@ -52,9 +52,10 @@ import widgets
 import updater
 import volume
 import synced_lyrics
+import lyrics_access
 import yandex
 
-VERSION = '2.5'     # версия программы для ПК (= тег релиза на GitHub)
+VERSION = '2.6'     # версия программы для ПК (= тег релиза на GitHub)
 HTTP_PORT = int(os.environ.get('NP_HTTP_PORT', '47801'))
 UDP_PORT = int(os.environ.get('NP_UDP_PORT', '47800'))
 POLL = 0.5           # секунд между опросами панели Windows
@@ -346,12 +347,16 @@ def want_lyrics(tid, dur, wait=True):
         return False
     now = time.time()
     meta = lyrics_meta.get(tid)
+    if meta and lyrics.get(tid, {}).get('source') == 'spicy' and now - meta['at'] > 3 * 86400:
+        lyrics.pop(tid, None)
+        lyrics_meta.pop(tid, None)
+        meta = None
     if meta is None:
         seen = lyrics_seen.setdefault(tid, now)
         if len(lyrics_seen) > 300:
             lyrics_seen.pop(next(iter(lyrics_seen)))
         return not wait or dur > 0 or now - seen > 3
-    if meta['dur'] == 0 and dur > 0:
+    if dur > 0 and (meta['dur'] == 0 or abs(meta['dur'] - dur) > 1000):
         return True
     return not meta['complete'] and meta['tries'] < 4 and now - meta['at'] > 15 * meta['tries']
 
@@ -370,23 +375,40 @@ async def fetch_lyrics(app, tid, title, artist, album, dur):
     """Текст через synced_lyrics: свои файлы из lyrics_dir(), потом LRCLIB (синхронный — только если
     длительность совпала), запасной — Яндекс."""
     try:
-        got = await synced_lyrics.fetch(app['http'], title, artist, album, dur, local_dirs=[lyrics_dir()])
+        got = await synced_lyrics.fetch(app['http'], title, artist, album, dur, local_dirs=[lyrics_dir()],
+                                       spicy_key=lyrics_access.CLIENT_KEY)
     except Exception as e:      # библиотека сама глушит сеть; это на всякий случай
         log.warning('lyrics: %s', e)
         got = synced_lyrics.Lyrics(complete=False)
-    result = {'synced': got.synced, 'plain': got.plain}
-    tries = lyrics_meta.get(tid, {}).get('tries', 0) + 1
-    log.info('lyrics for %s — %s: synced %d, plain %d (%s)%s', artist, title, len(result['synced']),
+    result = {'synced': got.synced, 'plain': got.plain, 'source': got.source,
+              'attribution': got.attribution}
+    previous_meta = lyrics_meta.get(tid, {})
+    tries = previous_meta.get('tries', 0) + 1
+    log.info('lyrics for %s — %s (%d ms): synced %d, plain %d (%s)%s', artist, title, dur, len(result['synced']),
              len(result['plain']), got.source or 'none', '' if got.complete else f', not all sources answered, try {tries}')
-    # не смогли проверить — старый найденный текст не затираем
-    if got or got.complete or tid not in lyrics:
+    previous = lyrics.get(tid)
+    # Новая сборка/перезапуск не должен повторять номер из предыдущего процесса.
+    revision = previous_meta.get('revision', int(time.time() * 1000) * 1000)
+    # Повторный запрос может улучшить текст, но не заменять уже найденные слова обычным текстом.
+    if previous is None or lyrics_quality(result) >= lyrics_quality(previous):
+        if result != previous:
+            revision += 1
         lyrics[tid] = result
-    lyrics_meta[tid] = {'complete': got.complete or bool(got.synced), 'dur': dur, 'at': time.time(), 'tries': tries}
+    # После запасного источника ещё дважды проверяем Spicy: метаданные плеера и каталог
+    # могут появиться с задержкой. Успешный Spicy/свой файл повторять не нужно.
+    complete = got.complete and (got.source in ('spicy', 'file') or tries >= 3)
+    lyrics_meta[tid] = {'complete': complete, 'dur': dur, 'at': time.time(), 'tries': tries,
+                        'revision': revision}
     lyrics_jobs.pop(tid, None)
     while len(lyrics) > 50:
         old = next(iter(lyrics))
         lyrics.pop(old)
         lyrics_meta.pop(old, None)
+
+
+def lyrics_quality(value):
+    return (value.get('source') == 'file', any(line.get('words') for line in value.get('synced', [])),
+            bool(value.get('synced')), bool(value.get('plain')), value.get('source') == 'spicy')
 
 
 def jsonr(data):
@@ -406,6 +428,7 @@ async def h_now(request):
     s['server_time_ms'] = int(now_ms())
     s['has_art'] = s['track_id'] in art
     s['lyrics_ready'] = s['track_id'] in lyrics
+    s['lyrics_rev'] = lyrics_meta.get(s['track_id'], {}).get('revision', 0)
     s['bg'] = (FRAME.info() if S['frame_on'] else None) or (BG.info() if S['clock_bg'] else None)   # фоторамка важнее своего фона
     if tv:   # телевизору — видео в полном качестве; у уже скачанного трека доделаем его
         if s['track_id'] in CLIPS.ready and s['duration_ms']:

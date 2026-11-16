@@ -25,6 +25,7 @@ jobs:
         shell: python
         run: |
           import json, os, re, subprocess, sys
+          from datetime import datetime, timezone
 
           repo = os.environ["REPO"]
 
@@ -45,6 +46,19 @@ jobs:
               if ver(r["tag_name"]) <= latest:
                   print(f"skip {r['tag_name']}: not newer than the latest release")
                   continue
+              # Отложенный выпуск: черновик можно подготовить заранее, не выпуская сегодня.
+              gate = re.search(r"<!--\s*publish-after:\s*(\S+)\s*-->", r.get("body") or "")
+              if gate:
+                  try:
+                      publish_after = datetime.fromisoformat(gate[1].replace("Z", "+00:00"))
+                      if publish_after.tzinfo is None:
+                          raise ValueError("publish-after requires a timezone")
+                  except ValueError:
+                      print(f"skip {r['tag_name']}: invalid publish-after")
+                      continue
+                  if datetime.now(timezone.utc) < publish_after:
+                      print(f"skip {r['tag_name']}: scheduled for {publish_after.isoformat()}")
+                      continue
               if "SHA256SUMS.txt" not in names or "NowPlayingServer.exe" not in names:
                   print(f"skip {r['tag_name']}: files are missing")
                   continue
