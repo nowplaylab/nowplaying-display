@@ -65,6 +65,18 @@ import java.util.Random;
  *  (MainActivity), и заставка (NowPlayingDream) — поэтому это не Activity, а обёртка над
  *  контекстом и окном того, кто показывает. */
 public class Screen extends android.view.ContextThemeWrapper {
+    private static void appendLyricWords(JSONObject vocal, int offset, int length,
+                                         List<LyricsView.Word> result) {
+        JSONArray words = vocal.optJSONArray("words");
+        for (int i = 0; words != null && i < words.length(); i++) {
+            JSONObject word = words.optJSONObject(i);
+            if (word == null) continue;
+            long start = word.optLong("t", -1), end = word.optLong("end", -1);
+            int from = word.optInt("start", -1), to = word.optInt("stop", -1);
+            if (start >= 0 && end >= start && from >= 0 && to > from && to <= length)
+                result.add(new LyricsView.Word(start, end, offset + from, offset + to));
+        }
+    }
     /** Кто показывает экран: приложение передаёт сюда стандартную обработку клавиш. */
     interface Host {
         boolean superDispatchKeyEvent(KeyEvent e);
@@ -2769,6 +2781,7 @@ public class Screen extends android.view.ContextThemeWrapper {
                         final List<Long> t = new ArrayList<Long>();
                         final List<String> lines = new ArrayList<String>();
                         final List<List<LyricsView.Word>> wordLines = new ArrayList<List<LyricsView.Word>>();
+                        final List<Integer> leadLengths = new ArrayList<Integer>();
                         final String credits = lyricsCredits(l.optJSONObject("attribution"));
                         JSONArray synced = l.optJSONArray("synced");
                         boolean isSynced = synced != null && synced.length() > 0;
@@ -2776,17 +2789,21 @@ public class Screen extends android.view.ContextThemeWrapper {
                             for (int k = 0; k < synced.length(); k++) {
                                 JSONObject o = synced.getJSONObject(k);
                                 t.add(o.getLong("t"));
-                                lines.add(o.optString("text"));
+                                StringBuilder lineText = new StringBuilder(o.optString("text"));
+                                leadLengths.add(lineText.length());
                                 List<LyricsView.Word> wordLine = new ArrayList<LyricsView.Word>();
-                                JSONArray ws = o.optJSONArray("words");
-                                for (int m = 0; ws != null && m < ws.length(); m++) {
-                                    JSONObject word = ws.getJSONObject(m);
-                                    long start = word.optLong("t", -1), end = word.optLong("end", -1);
-                                    int from = word.optInt("start", -1), to = word.optInt("stop", -1);
-                                    if (start >= 0 && end >= start && from >= 0 && to > from
-                                            && to <= o.optString("text").length())
-                                        wordLine.add(new LyricsView.Word(start, end, from, to));
+                                appendLyricWords(o, 0, lineText.length(), wordLine);
+                                JSONArray backing = o.optJSONArray("background");
+                                for (int m = 0; backing != null && m < backing.length(); m++) {
+                                    JSONObject vocal = backing.optJSONObject(m);
+                                    if (vocal == null) continue;
+                                    String part = vocal.optString("text");
+                                    if (part.trim().isEmpty()) continue;
+                                    lineText.append('\n');
+                                    appendLyricWords(vocal, lineText.length(), part.length(), wordLine);
+                                    lineText.append(part);
                                 }
+                                lines.add(lineText.toString());
                                 wordLines.add(wordLine);
                             }
                         } else {
@@ -2798,7 +2815,7 @@ public class Screen extends android.view.ContextThemeWrapper {
                             public void run() {
                                 if (!id.equals(trackId) || requestedRevision != lyricsRevision) return;
                                 lyrics.setLyrics(fs ? t : null, lines, fs);
-                                lyrics.setWords(wordLines);
+                                lyrics.setWords(wordLines, leadLengths);
                                 lyrics.setAttribution(android.text.Html.fromHtml(credits));
                                 lyrics.setVisibility(lines.isEmpty() ? View.GONE : View.VISIBLE);
                                 unsynced.setText("текст без синхронизации");

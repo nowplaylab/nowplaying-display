@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Bitmap;
 import android.graphics.BlurMaskFilter;
+import android.graphics.BitmapShader;
+import android.graphics.ComposeShader;
+import android.graphics.PorterDuff;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -21,6 +24,7 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.text.style.CharacterStyle;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.text.style.URLSpan;
 import android.view.View;
 import android.util.LruCache;
@@ -44,6 +48,8 @@ public class LyricsView extends View {
     private final Paint blurredPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final RectF blurredBounds = new RectF();
     private final List<List<Word>> words = new ArrayList<List<Word>>();
+    private final List<Integer> leadLengths = new ArrayList<Integer>();
+    private boolean drawingLead;
     private long positionMs, positionAt;
     private boolean playing;
     private boolean wordSynced;
@@ -51,21 +57,33 @@ public class LyricsView extends View {
     private int drawingAlpha;
     private long drawingPosition;
     private final List<List<Glow>> lineGlows = new ArrayList<List<Glow>>();
-    private final LruCache<Word, Bitmap> glowMasks = new LruCache<Word, Bitmap>(512 * 1024) {
-        @Override protected int sizeOf(Word key, Bitmap value) { return value.getByteCount(); }
+    private final LruCache<Word, GlowRaster> glowMasks = new LruCache<Word, GlowRaster>(512 * 1024) {
+        @Override protected int sizeOf(Word key, GlowRaster value) { return value.bitmap.getByteCount(); }
     };
     private final Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     private final RectF glowDestination = new RectF();
+    private final Matrix glowMatrix = new Matrix();
+
+    private static class GlowRaster {
+        Bitmap bitmap;
+        BitmapShader bitmapShader;
+        ComposeShader progressShader;
+    }
 
     private static class Glow {
         long start = Long.MAX_VALUE, end;
         final List<Word> segments = new ArrayList<Word>();
+
+        float durationEmphasis() {
+            return Math.max(0f, Math.min(1f, (end - start - 350f) / 1150f));
+        }
     }
 
     /** Один слог/слово. Индексы UTF-16, как у Android Layout. */
     public static class Word {
         public long start, end;
         public int from, to;
+        boolean backing;
         final List<RectF> boxes = new ArrayList<RectF>();
         final List<Boolean> rtl = new ArrayList<Boolean>();
         LinearGradient gradient;
@@ -84,13 +102,14 @@ public class LyricsView extends View {
             p.setShader(null);
             p.clearShadowLayer();
             p.baselineShift = 0;
-            if (!drawingTimed) return;
+            if (!drawingTimed || (!drawingLead && !word.backing)) return;
             float fraction = drawingPosition < word.start ? 0 : word.end <= word.start ? 1
                     : Math.min(1f, (float) (drawingPosition - word.start) / (word.end - word.start));
             p.setColor(0xffffffff);
-            p.setAlpha(drawingAlpha);
+            int alpha = word.backing ? Math.round(drawingAlpha * 0.8f) : drawingAlpha;
+            p.setAlpha(alpha);
             if (fraction <= 0) {
-                p.setAlpha((int) (drawingAlpha * 0.35f));
+                p.setAlpha((int) (alpha * 0.35f));
             } else if (fraction < 1f) {
                 if (word.gradient != null && word.boxes.size() == 1) {
                     RectF box = word.boxes.get(0);
@@ -101,7 +120,7 @@ public class LyricsView extends View {
                     p.setShader(word.gradient);
                 } else {
                     // Переносы и смешанные направления не режем по прямоугольникам.
-                    p.setAlpha((int) (drawingAlpha * (0.35f + 0.65f * fraction)));
+                    p.setAlpha((int) (alpha * (0.35f + 0.65f * fraction)));
                 }
                 float pulse = (float) Math.sin(Math.PI * fraction);
                 p.baselineShift = -Math.round(sp(1) * pulse);
@@ -110,8 +129,10 @@ public class LyricsView extends View {
         }
     }
 
-    public void setWords(List<List<Word>> value) {
+    public void setWords(List<List<Word>> value, List<Integer> lengths) {
         words.clear();
+        leadLengths.clear();
+        leadLengths.addAll(lengths);
         if (value != null) words.addAll(value);
         wordSynced = false;
         for (List<Word> line : words) if (!line.isEmpty()) { wordSynced = true; break; }
@@ -172,29 +193,7 @@ public class LyricsView extends View {
         creditPaint.setColor(0x99ffffff);
         creditPaint.linkColor = 0x99ffffff;
         creditPaint.setTextSize(sp(12));
-        // Затухание дополняет размытие у самой границы области текста.
-        setVerticalFadingEdgeEnabled(true);
-        setFadingEdgeLength(Math.round(sp(40)));
-    }
-
-    @Override
-    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-        super.onSizeChanged(w, h, oldw, oldh);
-        // У «Сцены» область текста бывает низкой: оставляем середину читаемой.
-        setFadingEdgeLength(Math.max(1, Math.min(Math.round(sp(40)), h / 5)));
-    }
-
-    @Override
-    protected float getTopFadingEdgeStrength() {
-        if (texts.isEmpty() || Float.isNaN(offset)) return 0f;
-        return Math.max(0f, Math.min(1f, offset / Math.max(1, getVerticalFadingEdgeLength())));
-    }
-
-    @Override
-    protected float getBottomFadingEdgeStrength() {
-        if (texts.isEmpty() || Float.isNaN(offset)) return 0f;
-        float remaining = totalHeight - offset - getHeight();
-        return Math.max(0f, Math.min(1f, remaining / Math.max(1, getVerticalFadingEdgeLength())));
+        // Без штатного fading edge: он добавлял промежуточный слой на старом GPU.
     }
 
     private float sp(float v) {
@@ -228,6 +227,7 @@ public class LyricsView extends View {
         times.clear();
         texts.clear();
         words.clear();
+        leadLengths.clear();
         wordSynced = false;
         attribution = "";
         creditLayout = null;
@@ -352,9 +352,12 @@ public class LyricsView extends View {
         for (int i = 0; i < texts.size(); i++) {
             String s = texts.get(i);
             CharSequence content = s.length() == 0 ? "♪" : s;
-            if (i < words.size() && !words.get(i).isEmpty()) {
+            int leadEnd = i < leadLengths.size() ? leadLengths.get(i) : s.length();
+            if (i < words.size() && (!words.get(i).isEmpty() || leadEnd < s.length())) {
                 SpannableString styled = new SpannableString(content);
+                styleBacking(styled, i);
                 for (Word word : words.get(i)) {
+                    word.backing = word.from > leadEnd;
                     if (word.from >= 0 && word.to <= s.length() && word.from < word.to)
                         styled.setSpan(new TimedWordStyle(word), word.from, word.to, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
@@ -443,51 +446,94 @@ public class LyricsView extends View {
         if (cached != null) return cached;
         int pad = Math.round(sp(10));
         StaticLayout original = layouts.get(index);
-        // Половинное разрешение и одноканальная маска: небольшой ограниченный кэш.
+        // Явный белый RGBA: ALPHA_8 по-разному окрашивается на старом HWUI.
         Bitmap bitmap = Bitmap.createBitmap((width + pad * 2 + 1) / 2,
-                (original.getHeight() + pad * 2 + 1) / 2, Bitmap.Config.ALPHA_8);
+                (original.getHeight() + pad * 2 + 1) / 2, Bitmap.Config.ARGB_8888);
         Canvas raster = new Canvas(bitmap);
         raster.scale(0.5f, 0.5f);
         raster.translate(pad, pad);
-        TextPaint soft = new TextPaint(paint);
-        soft.setColor(0xffffffff);
-        soft.setAlpha(255);
-        soft.setShader(null);
-        soft.clearShadowLayer();
-        soft.baselineShift = 0;
-        soft.setMaskFilter(new BlurMaskFilter(sp(4), BlurMaskFilter.Blur.NORMAL));
-        String text = texts.get(index);
-        new StaticLayout(text.length() == 0 ? "♪" : text, soft, width,
-                centered ? Layout.Alignment.ALIGN_CENTER : Layout.Alignment.ALIGN_NORMAL,
-                1.05f, 0, false).draw(raster);
+        // Растеризуем ту же раскладку, чтобы сохранить переносы и позиции букв.
+        int alpha = paint.getAlpha();
+        paint.setAlpha(255);
+        paint.setMaskFilter(new BlurMaskFilter(sp(1.7f), BlurMaskFilter.Blur.NORMAL));
+        try {
+            original.draw(raster);
+        } finally {
+            paint.setMaskFilter(null);
+            paint.setAlpha(alpha);
+        }
         blurredLines.put(index, bitmap);
         return bitmap;
+    }
+
+    private void drawEdgeRows(Canvas canvas, StaticLayout layout, int index, int width,
+                              int height, float y, int alpha) {
+        float zone = Math.min(sp(44), height * 0.16f);
+        for (int row = 0; row < layout.getLineCount(); row++) {
+            int top = layout.getLineTop(row);
+            int bottom = layout.getLineBottom(row);
+            if (y + bottom <= 0 || y + top >= height) continue;
+            float center = y + (top + bottom) / 2f;
+            float distance = Math.min(center, height - center);
+            if (distance <= 0) continue;
+            boolean soft = distance < zone;
+            int rowAlpha = soft ? Math.round(alpha * Math.min(1f, distance / (zone * 0.8f))) : alpha;
+            canvas.save();
+            if (layout.getLineCount() > 1) canvas.clipRect(0, top, width, bottom);
+            if (soft) {
+                Bitmap bitmap = blurredLine(index, width);
+                float pad = Math.round(sp(10));
+                blurredBounds.set(-pad, -pad, bitmap.getWidth() * 2f - pad, bitmap.getHeight() * 2f - pad);
+                blurredPaint.setColor(0xffffffff);
+                blurredPaint.setAlpha(rowAlpha);
+                canvas.drawBitmap(bitmap, null, blurredBounds, blurredPaint);
+            } else {
+                paint.setAlpha(rowAlpha);
+                layout.draw(canvas);
+            }
+            canvas.restore();
+        }
     }
 
     private float targetOffset(int h) {
         if (synced) {
             if (current < 0) return -h * 0.4f;
-            return tops[current] + layouts.get(current).getHeight() / 2f - h * 0.4f;
+            StaticLayout layout = layouts.get(current);
+            int leadEnd = current < leadLengths.size() ? leadLengths.get(current) : 0;
+            int height = leadEnd > 0 && leadEnd < texts.get(current).length()
+                    ? layout.getLineBottom(layout.getLineForOffset(leadEnd - 1)) : layout.getHeight();
+            return tops[current] + height / 2f - h * 0.4f;
         }
         return plainProgress * Math.max(0, totalHeight - h * 0.6f) - h * 0.1f;
     }
 
+    private void styleBacking(SpannableString text, int line) {
+        if (line < leadLengths.size() && leadLengths.get(line) + 1 < text.length())
+            text.setSpan(new RelativeSizeSpan(0.76f), leadLengths.get(line) + 1, text.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
     private void drawWordGlow(Canvas canvas, int line, int alpha) {
         for (Glow glow : lineGlows.get(line)) {
+            if (!drawingLead && !glow.segments.get(0).backing) continue;
             long elapsed = drawingPosition - glow.start;
             long tail = drawingPosition - glow.end;
             if (elapsed < 0 || tail >= 160) continue;
-            float strength = Math.min(1f, elapsed / 90f) * (1f - Math.max(0f, tail / 160f));
+            // Длительность слова определяет характер свечения, отдельные слоги —
+            // какую часть слова уже можно подсветить.
+            float emphasis = glow.durationEmphasis();
+            float attack = 65f + 95f * emphasis;
+            float strength = Math.min(1f, elapsed / attack) * (1f - Math.max(0f, tail / 160f));
             if (strength <= 0f) continue;
             for (Word segment : glow.segments) {
                 if (drawingPosition <= segment.start) continue;
                 float fraction = segment.end <= segment.start ? 1f
                         : Math.min(1f, (float) (drawingPosition - segment.start) / (segment.end - segment.start));
-                Bitmap mask = glowMasks.get(segment);
-                if (mask == null) {
+                GlowRaster cached = glowMasks.get(segment);
+                if (cached == null) {
                     RectF bounds = segment.glowBounds;
-                    mask = Bitmap.createBitmap(Math.max(1, (int) Math.ceil(bounds.width() / 2f)),
-                            Math.max(1, (int) Math.ceil(bounds.height() / 2f)), Bitmap.Config.ALPHA_8);
+                    Bitmap mask = Bitmap.createBitmap(Math.max(1, (int) Math.ceil(bounds.width() / 2f)),
+                            Math.max(1, (int) Math.ceil(bounds.height() / 2f)), Bitmap.Config.ARGB_8888);
                     Canvas raster = new Canvas(mask);
                     raster.scale(0.5f, 0.5f);
                     raster.translate(-bounds.left, -bounds.top);
@@ -498,6 +544,7 @@ public class LyricsView extends View {
                     // который при масштабировании выглядел как тёмный двойной контур.
                     soft.setMaskFilter(new BlurMaskFilter(sp(3), BlurMaskFilter.Blur.NORMAL));
                     SpannableString text = new SpannableString(texts.get(line));
+                    styleBacking(text, line);
                     if (segment.from > 0) text.setSpan(new ForegroundColorSpan(0x00ffffff), 0, segment.from,
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     if (segment.to < text.length()) text.setSpan(new ForegroundColorSpan(0x00ffffff), segment.to,
@@ -505,7 +552,12 @@ public class LyricsView extends View {
                     new StaticLayout(text, soft, getWidth(),
                             centered ? Layout.Alignment.ALIGN_CENTER : Layout.Alignment.ALIGN_NORMAL,
                             1.05f, 0, false).draw(raster);
-                    glowMasks.put(segment, mask);
+                    cached = new GlowRaster(); cached.bitmap = mask;
+                    cached.bitmapShader = new BitmapShader(mask, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    if (segment.glowGradient != null)
+                        cached.progressShader = new ComposeShader(cached.bitmapShader,
+                                segment.glowGradient, PorterDuff.Mode.DST_IN);
+                    glowMasks.put(segment, cached);
                 }
                 glowPaint.setColor(0xffffffff);
                 glowPaint.setShader(null);
@@ -517,15 +569,21 @@ public class LyricsView extends View {
                                 : box.left + box.width() * fraction;
                         segment.gradientMatrix.setTranslate(x - sp(2), 0);
                         segment.glowGradient.setLocalMatrix(segment.gradientMatrix);
-                        glowPaint.setShader(segment.glowGradient);
+                        glowPaint.setShader(cached.progressShader);
                     } else visibility *= fraction;
                 }
-                glowPaint.setAlpha(Math.round(alpha * 0.72f * visibility));
+                float intensity = glow.segments.get(0).backing ? 0.62f : 1f;
+                glowPaint.setAlpha(Math.round(alpha * (0.46f + 0.36f * emphasis) * visibility * intensity));
                 float rise = fraction < 1f ? -Math.round(sp(1) * (float) Math.sin(Math.PI * fraction)) : 0;
                 glowDestination.set(segment.glowBounds.left, segment.glowBounds.top + rise,
-                        segment.glowBounds.left + mask.getWidth() * 2f,
-                        segment.glowBounds.top + rise + mask.getHeight() * 2f);
-                canvas.drawBitmap(mask, null, glowDestination, glowPaint);
+                        segment.glowBounds.left + cached.bitmap.getWidth() * 2f,
+                        segment.glowBounds.top + rise + cached.bitmap.getHeight() * 2f);
+                if (glowPaint.getShader() != null) {
+                    glowMatrix.setScale(2f, 2f);
+                    glowMatrix.postTranslate(glowDestination.left, glowDestination.top);
+                    cached.bitmapShader.setLocalMatrix(glowMatrix);
+                    canvas.drawRect(glowDestination, glowPaint);
+                } else canvas.drawBitmap(cached.bitmap, null, glowDestination, glowPaint);
                 }
         }
     }
@@ -568,6 +626,7 @@ public class LyricsView extends View {
         float fade = Math.min(1f, (SystemClock.uptimeMillis() - lineChangedAt) / 320f);
         float blend = 1f - (float) Math.pow(1f - fade, 3);
         if (synced && fade < 1f && !browsing) moving = true;
+        drawingPosition = positionMs + (playing ? Math.min(250, SystemClock.uptimeMillis() - positionAt) : 0);
         for (int i = 0; i < layouts.size(); i++) {
             StaticLayout l = layouts.get(i);
             float y = tops[i] - offset;
@@ -584,40 +643,32 @@ public class LyricsView extends View {
             }
             if (alpha <= 0) continue;
             List<Word> timedWords = i < words.size() ? words.get(i) : null;
-            drawingTimed = i == current && timedWords != null && !timedWords.isEmpty();
-            // Плавная смена резкости по мере приближения строки к краю.
-            float zone = Math.min(sp(76), h * 0.22f);
-            float center = y + l.getHeight() / 2f;
-            float blur = drawingTimed ? 0f : Math.max(0f, 1f - Math.min(center, h - center) / zone);
-            blur = Math.min(1f, blur);
-            blur = blur * blur * (3f - 2f * blur);
-            Bitmap softLine = drawingTimed ? null : blurredLine(i, w);
-            paint.setAlpha(Math.round(alpha * (1f - blur)));
+            drawingLead = i == current;
+            long animationEnd = -1;
+            if (timedWords != null) for (Word word : timedWords) {
+                if (drawingLead || (word.backing && word.start <= drawingPosition && drawingPosition < word.end + 160))
+                    animationEnd = Math.max(animationEnd, word.end + 160);
+            }
+            drawingTimed = animationEnd >= 0;
+            paint.setAlpha(alpha);
             paint.setShader(null);
             paint.clearShadowLayer();
             paint.baselineShift = 0;
             canvas.save();
             canvas.translate(0, y);
             drawingAlpha = alpha;
-            drawingPosition = positionMs + (playing ? Math.min(250, SystemClock.uptimeMillis() - positionAt) : 0);
             if (drawingTimed) {
                 drawWordGlow(canvas, i, alpha);
-                paint.setAlpha((int) (alpha * 0.35f));
+                if (drawingLead) paint.setAlpha((int) (alpha * 0.35f));
                 l.draw(canvas);
                 // Только активная строка и только при воспроизведении; на паузе кадры не тратим.
-                if (playing && drawingPosition < timedWords.get(timedWords.size() - 1).end + 160) moving = true;
-            } else {
+                if (playing && drawingPosition < animationEnd) moving = true;
+            } else if (y >= sp(44) && bottom <= h - sp(44)) {
                 l.draw(canvas);
+            } else {
+                drawEdgeRows(canvas, l, i, w, h, y, alpha);
             }
             canvas.restore();
-            if (blur > 0 && softLine != null) {
-                float pad = Math.round(sp(10));
-                blurredBounds.set(-pad, y - pad,
-                        softLine.getWidth() * 2f - pad, y + softLine.getHeight() * 2f - pad);
-                blurredPaint.setColor(0xffffffff);
-                blurredPaint.setAlpha(Math.round(alpha * blur));
-                canvas.drawBitmap(softLine, null, blurredBounds, blurredPaint);
-            }
         }
 
         if (creditLayout != null) {
